@@ -178,14 +178,14 @@ export default function WarrantyDetails() {
               </div>
             </div>
 
-            {/* Access Code Info */}
+            {/* Contact Info */}
             <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
               <div className="flex items-start gap-3">
                 <Shield className="w-5 h-5 text-amber-400 mt-0.5" />
                 <div>
-                  <p className="text-amber-400 font-medium">Your Access Code</p>
+                  <p className="text-amber-400 font-medium">Need Help?</p>
                   <p className="text-sm text-slate-300 mt-1">
-                    An access code has been sent to your email. Use it to view all your warranties anytime.
+                    For anything you need to access your warranty, kindly contact us at <span className="text-amber-400 font-medium">0796595197</span>.
                   </p>
                 </div>
               </div>
