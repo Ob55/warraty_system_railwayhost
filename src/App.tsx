@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import ActivateWarranty from "./pages/ActivateWarranty";
 import MyWarranty from "./pages/MyWarranty";
+import WarrantyDetails from "./pages/WarrantyDetails";
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
@@ -25,6 +26,7 @@ const App = () => (
             <Route path="/activate-warranty" element={<ActivateWarranty />} />
             <Route path="/activate-warranty/:productId" element={<ActivateWarranty />} />
             <Route path="/my-warranty" element={<MyWarranty />} />
+            <Route path="/warranty-details/:warrantyId" element={<WarrantyDetails />} />
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="*" element={<NotFound />} />

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,25 +8,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Shield, Search, Calendar, Clock, Package } from 'lucide-react';
+import { Shield, Search, Calendar, Clock, Package, ArrowLeft } from 'lucide-react';
 import type { WarrantyWithDetails } from '@/lib/supabase-types';
 
 export default function MyWarranty() {
-  const [searchParams] = useSearchParams();
-  const [accessCode, setAccessCode] = useState(searchParams.get('code') || '');
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
   const [warranties, setWarranties] = useState<WarrantyWithDetails[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searched, setSearched] = useState(!!searchParams.get('code'));
-
-  useEffect(() => {
-    if (searchParams.get('code')) {
-      handleSearch();
-    }
-  }, []);
+  const [searched, setSearched] = useState(false);
 
   const handleSearch = async () => {
-    if (!accessCode.trim()) {
-      toast.error('Please enter your access code');
+    if (!fullName.trim() || !phone.trim()) {
+      toast.error('Please enter both your full name and phone number');
       return;
     }
 
@@ -34,24 +28,27 @@ export default function MyWarranty() {
     setSearched(true);
 
     try {
-      // Find the warranty owner by access code
-      const { data: owner, error: ownerError } = await supabase
+      // Find the warranty owner by full name AND phone
+      const { data: owners, error: ownerError } = await supabase
         .from('warranty_owners')
         .select('*')
-        .eq('access_code', accessCode.toUpperCase())
-        .maybeSingle();
+        .ilike('full_name', `%${fullName.trim()}%`)
+        .ilike('phone', `%${phone.trim()}%`);
 
       if (ownerError) {
         throw ownerError;
       }
 
-      if (!owner) {
+      if (!owners || owners.length === 0) {
         setWarranties([]);
-        toast.error('No warranties found with this code');
+        toast.error('No warranties found');
         return;
       }
 
-      // Fetch all warranties for this owner
+      // Get all owner IDs
+      const ownerIds = owners.map(o => o.id);
+
+      // Fetch all warranties for these owners
       const { data: warrantiesData, error: warrantiesError } = await supabase
         .from('warranties')
         .select(`
@@ -59,7 +56,7 @@ export default function MyWarranty() {
           product:products(*),
           owner:warranty_owners(*)
         `)
-        .eq('owner_id', owner.id)
+        .in('owner_id', ownerIds)
         .order('created_at', { ascending: false });
 
       if (warrantiesError) {
@@ -67,6 +64,10 @@ export default function MyWarranty() {
       }
 
       setWarranties((warrantiesData as unknown as WarrantyWithDetails[]) || []);
+      
+      if (warrantiesData && warrantiesData.length > 0) {
+        toast.success(`Found ${warrantiesData.length} warranty(ies)`);
+      }
     } catch (error: any) {
       console.error('Error fetching warranties:', error);
       toast.error('Failed to fetch warranties');
@@ -101,36 +102,55 @@ export default function MyWarranty() {
             <Shield className="w-8 h-8 text-emerald-400" />
           </div>
           <h1 className="text-3xl font-bold text-white mb-2">My Warranties</h1>
-          <p className="text-slate-400">Enter your access code to view your warranties</p>
+          <p className="text-slate-400">Enter your name and phone number to view your warranties</p>
         </div>
 
         {/* Search Section */}
         <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm mb-8">
-          <CardContent className="pt-6">
-            <div className="flex gap-4">
-              <div className="flex-1">
-                <Label htmlFor="accessCode" className="sr-only">Access Code</Label>
-                <Input
-                  id="accessCode"
-                  value={accessCode}
-                  onChange={(e) => setAccessCode(e.target.value)}
-                  placeholder="Enter your access code"
-                  className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500"
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                />
-              </div>
-              <Button
-                onClick={handleSearch}
-                disabled={loading}
-                className="bg-emerald-600 hover:bg-emerald-700"
-              >
-                {loading ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
-                ) : (
-                  <Search className="w-4 h-4" />
-                )}
-              </Button>
+          <CardHeader>
+            <CardTitle className="text-white text-lg">Search Warranties</CardTitle>
+            <CardDescription className="text-slate-400">
+              Enter the details you used when registering your warranty
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="fullName" className="text-slate-200">Full Name</Label>
+              <Input
+                id="fullName"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Enter your full name"
+                className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500"
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone" className="text-slate-200">Phone Number</Label>
+              <Input
+                id="phone"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Enter your phone number"
+                className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500"
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              />
+            </div>
+            <Button
+              onClick={handleSearch}
+              disabled={loading}
+              className="w-full bg-emerald-600 hover:bg-emerald-700"
+            >
+              {loading ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+              ) : (
+                <>
+                  <Search className="w-4 h-4 mr-2" />
+                  Search Warranties
+                </>
+              )}
+            </Button>
           </CardContent>
         </Card>
 
@@ -141,9 +161,12 @@ export default function MyWarranty() {
               <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
                 <CardContent className="py-12 text-center">
                   <Shield className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-                  <p className="text-slate-400">No warranties found with this access code</p>
+                  <p className="text-slate-400 mb-2">No warranties found</p>
+                  <p className="text-sm text-slate-500 mb-4">
+                    Make sure you entered the same name and phone number used during registration
+                  </p>
                   <Link to="/activate-warranty">
-                    <Button variant="link" className="text-emerald-400 mt-2">
+                    <Button variant="link" className="text-emerald-400">
                       Register a new warranty
                     </Button>
                   </Link>
@@ -218,8 +241,9 @@ export default function MyWarranty() {
 
         {/* Footer Links */}
         <div className="text-center mt-8">
-          <Link to="/" className="text-slate-400 hover:text-emerald-400 transition-colors">
-            ← Back to Home
+          <Link to="/" className="inline-flex items-center text-slate-400 hover:text-emerald-400 transition-colors">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Home
           </Link>
         </div>
       </div>
