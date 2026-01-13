@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -20,9 +20,9 @@ import {
   Trash2, 
   Eye,
   QrCode,
-  Plus
+  Home
 } from 'lucide-react';
-import type { WarrantyWithDetails, Product, ProductType } from '@/lib/supabase-types';
+import type { WarrantyWithDetails, Product } from '@/lib/supabase-types';
 import QRCode from 'qrcode';
 
 export default function AdminDashboard() {
@@ -30,7 +30,6 @@ export default function AdminDashboard() {
   const { user, isAdmin, isLoading, signOut } = useAuth();
   const [warranties, setWarranties] = useState<WarrantyWithDetails[]>([]);
   const [filteredWarranties, setFilteredWarranties] = useState<WarrantyWithDetails[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -44,15 +43,8 @@ export default function AdminDashboard() {
   const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showQRDialog, setShowQRDialog] = useState(false);
-  const [showAddProductDialog, setShowAddProductDialog] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [qrCodeUrl, setQrCodeUrl] = useState('');
-  
-  // New product form
-  const [newProduct, setNewProduct] = useState({
-    productType: 'EPC' as ProductType,
-    serialNumber: ''
-  });
 
   useEffect(() => {
     if (!isLoading && (!user || !isAdmin)) {
@@ -107,15 +99,6 @@ export default function AdminDashboard() {
       setTotalWarranties(total);
       setActiveWarranties(active);
       setExpiredWarranties(expired);
-
-      // Fetch products
-      const { data: productsData, error: productsError } = await supabase
-        .from('products')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (productsError) throw productsError;
-      setProducts((productsData as Product[]) || []);
 
     } catch (error: any) {
       console.error('Error fetching data:', error);
@@ -190,40 +173,6 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleAddProduct = async () => {
-    if (!newProduct.serialNumber.trim()) {
-      toast.error('Please enter a serial number');
-      return;
-    }
-
-    try {
-      // Generate a static QR code that never changes
-      const qrCode = `product-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-      
-      const { error } = await supabase
-        .from('products')
-        .insert({
-          product_type: newProduct.productType,
-          serial_number: newProduct.serialNumber,
-          qr_code: qrCode
-        });
-
-      if (error) throw error;
-
-      toast.success('Product added successfully');
-      setShowAddProductDialog(false);
-      setNewProduct({ productType: 'EPC', serialNumber: '' });
-      fetchData();
-    } catch (error: any) {
-      console.error('Error adding product:', error);
-      if (error.message?.includes('duplicate')) {
-        toast.error('A product with this serial number already exists');
-      } else {
-        toast.error('Failed to add product');
-      }
-    }
-  };
-
   const handleLogout = async () => {
     await signOut();
     navigate('/admin/login');
@@ -266,14 +215,25 @@ export default function AdminDashboard() {
             </div>
             <h1 className="text-xl font-bold text-white">Admin Dashboard</h1>
           </div>
-          <Button
-            onClick={handleLogout}
-            variant="ghost"
-            className="text-slate-400 hover:text-white hover:bg-slate-700"
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            Logout
-          </Button>
+          <div className="flex items-center gap-2">
+            <Link to="/">
+              <Button
+                variant="ghost"
+                className="text-slate-400 hover:text-white hover:bg-slate-700"
+              >
+                <Home className="w-4 h-4 mr-2" />
+                Go to Home
+              </Button>
+            </Link>
+            <Button
+              onClick={handleLogout}
+              variant="ghost"
+              className="text-slate-400 hover:text-white hover:bg-slate-700"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Logout
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -322,57 +282,6 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
         </div>
-
-        {/* Products Section */}
-        <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm mb-8">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-white">Products</CardTitle>
-                <CardDescription className="text-slate-400">
-                  Manage products and their QR codes
-                </CardDescription>
-              </div>
-              <Button
-                onClick={() => setShowAddProductDialog(true)}
-                className="bg-emerald-600 hover:bg-emerald-700"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Product
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {products.length === 0 ? (
-              <div className="text-center py-8 text-slate-400">
-                No products yet. Add your first product to generate QR codes.
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {products.map((product) => (
-                  <div
-                    key={product.id}
-                    className="p-4 rounded-lg bg-slate-700/50 border border-slate-600 flex items-center justify-between"
-                  >
-                    <div>
-                      <p className="text-white font-medium">{product.product_type}</p>
-                      <p className="text-sm text-slate-400">{product.serial_number}</p>
-                    </div>
-                    <Button
-                      onClick={() => handleViewQR(product)}
-                      variant="ghost"
-                      size="sm"
-                      className="text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
-                    >
-                      <QrCode className="w-4 h-4 mr-1" />
-                      View QR
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
         {/* Search Bar */}
         <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm mb-6">
@@ -424,9 +333,23 @@ export default function AdminDashboard() {
                             {isExpired ? 'Expired' : 'Active'}
                           </Badge>
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-slate-400">
-                          <Clock className="w-4 h-4" />
-                          <span>{isExpired ? 'Expired' : `${daysRemaining} days remaining`}</span>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-sm text-slate-400">
+                            <Clock className="w-4 h-4" />
+                            <span>{isExpired ? 'Expired' : `${daysRemaining} days remaining`}</span>
+                          </div>
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewQR(warranty.product);
+                            }}
+                            variant="ghost"
+                            size="sm"
+                            className="text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
+                          >
+                            <QrCode className="w-4 h-4 mr-1" />
+                            View QR
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
@@ -483,10 +406,6 @@ export default function AdminDashboard() {
                 <div>
                   <p className="text-sm text-slate-400">Expiry Date</p>
                   <p className="text-white">{new Date(selectedWarranty.expiry_date).toLocaleDateString()}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-slate-400">Access Code</p>
-                  <p className="text-white font-mono">****{selectedWarranty.owner.access_code.slice(-4)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-slate-400">View Count</p>
@@ -587,56 +506,6 @@ export default function AdminDashboard() {
               className="border-slate-600 text-slate-300 hover:bg-slate-700"
             >
               Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add Product Dialog */}
-      <Dialog open={showAddProductDialog} onOpenChange={setShowAddProductDialog}>
-        <DialogContent className="bg-slate-800 border-slate-700 text-white">
-          <DialogHeader>
-            <DialogTitle>Add New Product</DialogTitle>
-            <DialogDescription className="text-slate-400">
-              Create a new product with a static QR code
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm text-slate-200">Product Type</label>
-              <select
-                value={newProduct.productType}
-                onChange={(e) => setNewProduct({ ...newProduct, productType: e.target.value as ProductType })}
-                className="w-full p-2 rounded-md bg-slate-700/50 border border-slate-600 text-white"
-              >
-                <option value="EPC">EPC</option>
-                <option value="LPG">LPG</option>
-                <option value="OTHER">Other</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm text-slate-200">Serial Number</label>
-              <Input
-                value={newProduct.serialNumber}
-                onChange={(e) => setNewProduct({ ...newProduct, serialNumber: e.target.value })}
-                placeholder="Enter serial number"
-                className="bg-slate-700/50 border-slate-600 text-white"
-              />
-            </div>
-          </div>
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowAddProductDialog(false)}
-              className="border-slate-600 text-slate-300 hover:bg-slate-700"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleAddProduct}
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
-              Add Product
             </Button>
           </DialogFooter>
         </DialogContent>
