@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Shield, CheckCircle } from 'lucide-react';
+import { Shield, CheckCircle, ArrowLeft } from 'lucide-react';
 import type { Product, ProductType } from '@/lib/supabase-types';
 
 export default function ActivateWarranty() {
@@ -146,8 +146,8 @@ export default function ActivateWarranty() {
 
       toast.success('Warranty registered successfully!');
       
-      // Redirect to warranty view with access code
-      navigate(`/my-warranty?code=${accessCode}`);
+      // Redirect to warranty details page
+      navigate(`/warranty-details/${warranty.id}`);
     } catch (error: any) {
       console.error('Error registering warranty:', error);
       toast.error(error.message || 'Failed to register warranty');
@@ -171,7 +171,7 @@ export default function ActivateWarranty() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/20 mb-4">
             <Shield className="w-8 h-8 text-emerald-400" />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">Activate Your Warranty</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">Activate Warrant</h1>
           <p className="text-slate-400">Register your product to activate the 365-day warranty</p>
         </div>
 
@@ -252,23 +252,35 @@ export default function ActivateWarranty() {
                 />
               </div>
 
-              <Button
-                type="submit"
-                disabled={submitting}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-              >
-                {submitting ? (
-                  <span className="flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
-                    Registering...
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4" />
-                    Register Warranty
-                  </span>
-                )}
-              </Button>
+              <div className="flex gap-3 pt-2">
+                <Link to="/" className="flex-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full border-slate-600 text-slate-300 hover:bg-slate-700"
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Back
+                  </Button>
+                </Link>
+                <Button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  {submitting ? (
+                    <span className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                      Registering...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4" />
+                      Register Warranty
+                    </span>
+                  )}
+                </Button>
+              </div>
             </form>
           </CardContent>
         </Card>

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Shield, QrCode, Search, Lock } from 'lucide-react';
 
 export default function Index() {
@@ -13,11 +13,11 @@ export default function Index() {
             <Shield className="w-10 h-10 text-emerald-400" />
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-            Warranty Management System
+            Activate Warrant
           </h1>
           <p className="text-xl text-slate-400 max-w-2xl mx-auto">
             Register, track, and manage your product warranties with ease. 
-            Scan a QR code or enter your access code to get started.
+            Scan a QR code or enter your access details to get started.
           </p>
         </div>
 
@@ -42,7 +42,7 @@ export default function Index() {
               </div>
               <CardTitle className="text-white">Easy Access</CardTitle>
               <CardDescription className="text-slate-400">
-                Use your unique access code to view all your warranties anytime, anywhere
+                Use your name and phone number to view all your warranties anytime, anywhere
               </CardDescription>
             </CardHeader>
           </Card>
@@ -65,7 +65,7 @@ export default function Index() {
           <Link to="/activate-warranty">
             <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white px-8">
               <QrCode className="w-5 h-5 mr-2" />
-              Activate Warranty
+              Activate Warrant
             </Button>
           </Link>
           <Link to="/my-warranty">
