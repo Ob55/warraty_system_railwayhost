@@ -55,9 +55,7 @@ export default function ActivateWarranty() {
     fetchProduct();
   }, [productId]);
 
-  const generateAccessCode = (): string => {
-    return Math.random().toString(36).substring(2, 10).toUpperCase();
-  };
+  // Access code generation is now handled by backend
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,84 +68,32 @@ export default function ActivateWarranty() {
     setSubmitting(true);
 
     try {
-      // Check if warranty owner already exists with this email
-      let ownerId: string;
-      let accessCode: string;
-
-      const { data: existingOwner, error: ownerCheckError } = await supabase
-        .from('warranty_owners')
-        .select('*')
-        .eq('email', formData.email.toLowerCase())
-        .maybeSingle();
-
-      if (ownerCheckError) {
-        throw ownerCheckError;
-      }
-
-      if (existingOwner) {
-        // Reuse existing owner and access code
-        ownerId = existingOwner.id;
-        accessCode = existingOwner.access_code;
-      } else {
-        // Create new warranty owner
-        accessCode = generateAccessCode();
-        const { data: newOwner, error: createOwnerError } = await supabase
-          .from('warranty_owners')
-          .insert({
-            full_name: formData.fullName,
-            email: formData.email.toLowerCase(),
-            phone: formData.phone,
-            access_code: accessCode
-          })
-          .select()
-          .single();
-
-        if (createOwnerError) {
-          throw createOwnerError;
+      // Call backend edge function to register warranty (bypasses RLS)
+      const response = await supabase.functions.invoke('register-warranty', {
+        body: {
+          fullName: formData.fullName,
+          email: formData.email,
+          phone: formData.phone,
+          productType: formData.productType,
+          serialNumber: formData.serialNumber,
+          productId: productId
         }
-        ownerId = newOwner.id;
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to register warranty');
       }
 
-      // Get or create the product
-      let finalProductId = productId;
-
-      if (!productId) {
-        // Create a new product if none provided
-        const qrCode = `product-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-        const { data: newProduct, error: productError } = await supabase
-          .from('products')
-          .insert({
-            product_type: formData.productType,
-            serial_number: formData.serialNumber || `SN-${Date.now()}`,
-            qr_code: qrCode
-          })
-          .select()
-          .single();
-
-        if (productError) {
-          throw productError;
-        }
-        finalProductId = newProduct.id;
-      }
-
-      // Create the warranty
-      const { data: warranty, error: warrantyError } = await supabase
-        .from('warranties')
-        .insert({
-          product_id: finalProductId,
-          owner_id: ownerId
-        })
-        .select()
-        .single();
-
-      if (warrantyError) {
-        throw warrantyError;
+      const data = response.data;
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to register warranty');
       }
 
       toast.success('Warranty registered successfully!');
       
       // Redirect to warranty details page
-      navigate(`/warranty-details/${warranty.id}`);
+      navigate(`/warranty-details/${data.warranty.id}`);
     } catch (error: any) {
       console.error('Error registering warranty:', error);
       toast.error(error.message || 'Failed to register warranty');
