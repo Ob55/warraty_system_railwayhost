@@ -2,3 +2,6 @@ project_id = "oplszeiktzldkqbczfzj"
 
 [functions.seed-admin]
 verify_jwt = false
+
+[functions.register-warranty]
+verify_jwt = false

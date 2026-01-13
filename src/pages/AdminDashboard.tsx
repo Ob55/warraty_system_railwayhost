@@ -364,7 +364,8 @@ export default function AdminDashboard() {
                       size="sm"
                       className="text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
                     >
-                      <QrCode className="w-4 h-4" />
+                      <QrCode className="w-4 h-4 mr-1" />
+                      View QR
                     </Button>
                   </div>
                 ))}
