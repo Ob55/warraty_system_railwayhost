@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.register-warranty]
 verify_jwt = false
+
+[functions.upload-serials]
+verify_jwt = false
+
+[functions.add-serial]
+verify_jwt = false

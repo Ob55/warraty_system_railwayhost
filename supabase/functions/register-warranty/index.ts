@@ -10,9 +10,12 @@ interface RegisterWarrantyRequest {
   email: string
   phone: string
   productType: string
-  serialNumber?: string
+  serialNumber: string
   productId?: string
 }
+
+// Serial number format validation
+const SERIAL_FORMAT_REGEX = /^[A-Z0-9\-]{5,50}$/i;
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
@@ -33,10 +36,49 @@ Deno.serve(async (req) => {
     const { fullName, email, phone, productType, serialNumber, productId } = body
 
     // Validate required fields
-    if (!fullName || !email || !phone || !productType) {
+    if (!fullName || !email || !phone || !productType || !serialNumber) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields: fullName, email, phone, productType' }),
+        JSON.stringify({ error: 'Missing required fields: fullName, email, phone, productType, serialNumber' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const trimmedSerial = serialNumber.trim().toUpperCase()
+
+    // Validate serial number format
+    if (!SERIAL_FORMAT_REGEX.test(trimmedSerial)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid serial number format. Please check and try again.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Check if serial number exists in the system
+    const { data: serialData, error: serialError } = await supabaseAdmin
+      .from('serial_numbers')
+      .select('*')
+      .eq('serial_number', trimmedSerial)
+      .maybeSingle()
+
+    if (serialError) {
+      console.error('Error checking serial:', serialError)
+      return new Response(
+        JSON.stringify({ error: 'Failed to verify serial number' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (!serialData) {
+      return new Response(
+        JSON.stringify({ error: 'Serial number not found. Please check the serial number again.' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (serialData.status === 'used') {
+      return new Response(
+        JSON.stringify({ error: 'This serial number has already been registered.' }),
+        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -88,48 +130,27 @@ Deno.serve(async (req) => {
       console.log('Created new owner:', ownerId)
     }
 
-    // Get or create the product
-    let finalProductId = productId
+    // Create a new product with the validated serial number
+    const qrCode = `product-${Date.now()}-${Math.random().toString(36).substring(7)}`
+    const { data: newProduct, error: productError } = await supabaseAdmin
+      .from('products')
+      .insert({
+        product_type: productType,
+        serial_number: trimmedSerial,
+        qr_code: qrCode
+      })
+      .select()
+      .single()
 
-    if (!productId) {
-      // Create a new product if none provided (static QR code, never changes)
-      const qrCode = `product-${Date.now()}-${Math.random().toString(36).substring(7)}`
-      const { data: newProduct, error: productError } = await supabaseAdmin
-        .from('products')
-        .insert({
-          product_type: productType,
-          serial_number: serialNumber || `SN-${Date.now()}`,
-          qr_code: qrCode
-        })
-        .select()
-        .single()
-
-      if (productError) {
-        console.error('Error creating product:', productError)
-        return new Response(
-          JSON.stringify({ error: 'Failed to create product', details: productError.message }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-      finalProductId = newProduct.id
-      console.log('Created new product:', finalProductId)
-    } else {
-      // Verify the product exists
-      const { data: existingProduct, error: productCheckError } = await supabaseAdmin
-        .from('products')
-        .select('id')
-        .eq('id', productId)
-        .maybeSingle()
-
-      if (productCheckError || !existingProduct) {
-        console.error('Product not found:', productId)
-        return new Response(
-          JSON.stringify({ error: 'Product not found' }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-      console.log('Using existing product:', productId)
+    if (productError) {
+      console.error('Error creating product:', productError)
+      return new Response(
+        JSON.stringify({ error: 'Failed to create product', details: productError.message }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
+    const finalProductId = newProduct.id
+    console.log('Created new product:', finalProductId)
 
     // Create the warranty
     const { data: warranty, error: warrantyError } = await supabaseAdmin
@@ -147,6 +168,21 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: 'Failed to create warranty', details: warrantyError.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
+    }
+
+    // Update serial number status to 'used' and link to warranty
+    const { error: updateSerialError } = await supabaseAdmin
+      .from('serial_numbers')
+      .update({
+        status: 'used',
+        warranty_id: warranty.id,
+        used_at: new Date().toISOString()
+      })
+      .eq('id', serialData.id)
+
+    if (updateSerialError) {
+      console.error('Error updating serial status:', updateSerialError)
+      // Don't fail the request, warranty is already created
     }
 
     console.log('Warranty created successfully:', warranty.id)
