@@ -41,6 +41,41 @@ export type Database = {
         }
         Relationships: []
       }
+      serial_numbers: {
+        Row: {
+          created_at: string
+          id: string
+          serial_number: string
+          status: string
+          used_at: string | null
+          warranty_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          serial_number: string
+          status?: string
+          used_at?: string | null
+          warranty_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          serial_number?: string
+          status?: string
+          used_at?: string | null
+          warranty_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serial_numbers_warranty_id_fkey"
+            columns: ["warranty_id"]
+            isOneToOne: false
+            referencedRelation: "warranties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string

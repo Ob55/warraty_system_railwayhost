@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { 
   Shield, 
@@ -20,10 +21,23 @@ import {
   Trash2, 
   Eye,
   QrCode,
-  Home
+  Home,
+  Upload,
+  Plus,
+  Hash
 } from 'lucide-react';
 import type { WarrantyWithDetails, Product } from '@/lib/supabase-types';
 import QRCode from 'qrcode';
+import * as XLSX from 'xlsx';
+
+interface SerialNumber {
+  id: string;
+  serial_number: string;
+  status: 'used' | 'unused';
+  warranty_id: string | null;
+  created_at: string;
+  used_at: string | null;
+}
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -37,6 +51,19 @@ export default function AdminDashboard() {
   const [totalWarranties, setTotalWarranties] = useState(0);
   const [activeWarranties, setActiveWarranties] = useState(0);
   const [expiredWarranties, setExpiredWarranties] = useState(0);
+
+  // Serial Numbers
+  const [serialNumbers, setSerialNumbers] = useState<SerialNumber[]>([]);
+  const [totalSerials, setTotalSerials] = useState(0);
+  const [usedSerials, setUsedSerials] = useState(0);
+  const [unusedSerials, setUnusedSerials] = useState(0);
+  const [showAddSerialDialog, setShowAddSerialDialog] = useState(false);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [showSerialsListDialog, setShowSerialsListDialog] = useState(false);
+  const [newSerialNumber, setNewSerialNumber] = useState('');
+  const [addingSerial, setAddingSerial] = useState(false);
+  const [uploadingSerials, setUploadingSerials] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Dialogs
   const [selectedWarranty, setSelectedWarranty] = useState<WarrantyWithDetails | null>(null);
@@ -67,7 +94,8 @@ export default function AdminDashboard() {
       const filtered = warranties.filter(w => 
         w.owner.full_name.toLowerCase().includes(query) ||
         w.owner.email.toLowerCase().includes(query) ||
-        w.owner.phone.toLowerCase().includes(query)
+        w.owner.phone.toLowerCase().includes(query) ||
+        w.product.serial_number.toLowerCase().includes(query)
       );
       setFilteredWarranties(filtered);
     }
@@ -99,6 +127,22 @@ export default function AdminDashboard() {
       setTotalWarranties(total);
       setActiveWarranties(active);
       setExpiredWarranties(expired);
+
+      // Fetch serial numbers
+      const { data: serialsData, error: serialsError } = await supabase
+        .from('serial_numbers')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (serialsError) {
+        console.error('Error fetching serials:', serialsError);
+      } else {
+        const serials = (serialsData as SerialNumber[]) || [];
+        setSerialNumbers(serials);
+        setTotalSerials(serials.length);
+        setUsedSerials(serials.filter(s => s.status === 'used').length);
+        setUnusedSerials(serials.filter(s => s.status === 'unused').length);
+      }
 
     } catch (error: any) {
       console.error('Error fetching data:', error);
@@ -170,6 +214,114 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Error generating QR code:', error);
       toast.error('Failed to generate QR code');
+    }
+  };
+
+  const handleAddSerial = async () => {
+    if (!newSerialNumber.trim()) {
+      toast.error('Please enter a serial number');
+      return;
+    }
+
+    setAddingSerial(true);
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      const response = await supabase.functions.invoke('add-serial', {
+        body: { serialNumber: newSerialNumber },
+        headers: {
+          Authorization: `Bearer ${session.session?.access_token}`
+        }
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      if (!response.data.success) {
+        throw new Error(response.data.error || 'Failed to add serial number');
+      }
+
+      toast.success('Serial number added successfully');
+      setNewSerialNumber('');
+      setShowAddSerialDialog(false);
+      fetchData();
+    } catch (error: any) {
+      console.error('Error adding serial:', error);
+      toast.error(error.message || 'Failed to add serial number');
+    } finally {
+      setAddingSerial(false);
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploadingSerials(true);
+    try {
+      const serialNumbers: string[] = [];
+      
+      if (file.name.endsWith('.csv')) {
+        // Handle CSV
+        const text = await file.text();
+        const lines = text.split(/\r?\n/);
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed) {
+            serialNumbers.push(trimmed);
+          }
+        }
+      } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+        // Handle Excel
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as any[][];
+        
+        for (const row of data) {
+          if (row[0]) {
+            const value = String(row[0]).trim();
+            if (value) {
+              serialNumbers.push(value);
+            }
+          }
+        }
+      } else {
+        toast.error('Please upload a CSV or Excel file');
+        return;
+      }
+
+      if (serialNumbers.length === 0) {
+        toast.error('No serial numbers found in file');
+        return;
+      }
+
+      const { data: session } = await supabase.auth.getSession();
+      const response = await supabase.functions.invoke('upload-serials', {
+        body: { serialNumbers },
+        headers: {
+          Authorization: `Bearer ${session.session?.access_token}`
+        }
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      const results = response.data.results;
+      toast.success(
+        `Upload complete: ${results.added} added, ${results.duplicates} duplicates, ${results.invalid} invalid`
+      );
+      setShowUploadDialog(false);
+      fetchData();
+    } catch (error: any) {
+      console.error('Error uploading serials:', error);
+      toast.error(error.message || 'Failed to upload serial numbers');
+    } finally {
+      setUploadingSerials(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -283,6 +435,59 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
+        {/* Serial Number Management */}
+        <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm mb-6">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2">
+              <Hash className="w-5 h-5" />
+              Serial Number Management
+            </CardTitle>
+            <CardDescription className="text-slate-400">
+              Manage manufacturer serial numbers for warranty registration
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+              <div className="bg-slate-700/50 rounded-lg p-4">
+                <p className="text-sm text-slate-400">Total Serial Numbers</p>
+                <p className="text-2xl font-bold text-white">{totalSerials}</p>
+              </div>
+              <div className="bg-slate-700/50 rounded-lg p-4">
+                <p className="text-sm text-slate-400">Used</p>
+                <p className="text-2xl font-bold text-red-400">{usedSerials}</p>
+              </div>
+              <div className="bg-slate-700/50 rounded-lg p-4">
+                <p className="text-sm text-slate-400">Unused</p>
+                <p className="text-2xl font-bold text-emerald-400">{unusedSerials}</p>
+              </div>
+              <div className="flex flex-col gap-2 justify-center">
+                <Button
+                  onClick={() => setShowUploadDialog(true)}
+                  className="bg-amber-600 hover:bg-amber-700 text-white"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload Serial Numbers
+                </Button>
+                <Button
+                  onClick={() => setShowAddSerialDialog(true)}
+                  variant="outline"
+                  className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Serial Number
+                </Button>
+              </div>
+            </div>
+            <Button
+              onClick={() => setShowSerialsListDialog(true)}
+              variant="ghost"
+              className="text-slate-400 hover:text-white"
+            >
+              View All Serial Numbers →
+            </Button>
+          </CardContent>
+        </Card>
+
         {/* Search Bar */}
         <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm mb-6">
           <CardContent className="pt-6">
@@ -291,7 +496,7 @@ export default function AdminDashboard() {
               <Input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by name, email, or phone..."
+                placeholder="Search by name, email, phone, or serial number..."
                 className="pl-10 bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500"
               />
             </div>
@@ -328,6 +533,7 @@ export default function AdminDashboard() {
                           <div>
                             <p className="text-white font-medium">{warranty.owner.full_name}</p>
                             <p className="text-sm text-slate-400">{warranty.product.product_type}</p>
+                            <p className="text-xs text-slate-500">{warranty.product.serial_number}</p>
                           </div>
                           <Badge className={isExpired ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'}>
                             {isExpired ? 'Expired' : 'Active'}
@@ -503,6 +709,143 @@ export default function AdminDashboard() {
             <Button
               variant="outline"
               onClick={() => setShowQRDialog(false)}
+              className="border-slate-600 text-slate-300 hover:bg-slate-700"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Serial Number Dialog */}
+      <Dialog open={showAddSerialDialog} onOpenChange={setShowAddSerialDialog}>
+        <DialogContent className="bg-slate-800 border-slate-700 text-white">
+          <DialogHeader>
+            <DialogTitle>Add Serial Number</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Add a new serial number to the system
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="serial" className="text-slate-200">Serial Number</Label>
+              <Input
+                id="serial"
+                value={newSerialNumber}
+                onChange={(e) => setNewSerialNumber(e.target.value.toUpperCase())}
+                placeholder="e.g. IGN-EPC-6L-2601-KE-001300"
+                className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500"
+              />
+              <p className="text-xs text-slate-500">
+                Must be 5-50 alphanumeric characters or hyphens
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowAddSerialDialog(false)}
+              className="border-slate-600 text-slate-300 hover:bg-slate-700"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddSerial}
+              disabled={addingSerial}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              {addingSerial ? 'Adding...' : 'Add Serial Number'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Upload Serial Numbers Dialog */}
+      <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+        <DialogContent className="bg-slate-800 border-slate-700 text-white">
+          <DialogHeader>
+            <DialogTitle>Upload Serial Numbers</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Upload an Excel or CSV file containing serial numbers (one per row)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="border-2 border-dashed border-slate-600 rounded-lg p-8 text-center">
+              <Upload className="w-12 h-12 text-slate-500 mx-auto mb-4" />
+              <p className="text-slate-400 mb-4">
+                Select a CSV or Excel file to upload
+              </p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                onChange={handleFileUpload}
+                className="hidden"
+                id="file-upload"
+              />
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingSerials}
+                className="bg-amber-600 hover:bg-amber-700"
+              >
+                {uploadingSerials ? 'Uploading...' : 'Choose File'}
+              </Button>
+            </div>
+            <p className="text-xs text-slate-500">
+              File format: One serial number per row. Example: IGN-EPC-6L-2601-KE-001300
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowUploadDialog(false)}
+              className="border-slate-600 text-slate-300 hover:bg-slate-700"
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Serial Numbers List Dialog */}
+      <Dialog open={showSerialsListDialog} onOpenChange={setShowSerialsListDialog}>
+        <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>All Serial Numbers</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              {serialNumbers.length} serial numbers in system
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto">
+            <table className="w-full">
+              <thead className="sticky top-0 bg-slate-800">
+                <tr className="border-b border-slate-700">
+                  <th className="text-left py-3 px-4 text-slate-400 font-medium">Serial Number</th>
+                  <th className="text-left py-3 px-4 text-slate-400 font-medium">Status</th>
+                  <th className="text-left py-3 px-4 text-slate-400 font-medium">Date Added</th>
+                </tr>
+              </thead>
+              <tbody>
+                {serialNumbers.map((serial) => (
+                  <tr key={serial.id} className="border-b border-slate-700/50 hover:bg-slate-700/30">
+                    <td className="py-3 px-4 text-white font-mono text-sm">{serial.serial_number}</td>
+                    <td className="py-3 px-4">
+                      <Badge className={serial.status === 'used' ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'}>
+                        {serial.status}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-4 text-slate-400 text-sm">
+                      {new Date(serial.created_at).toLocaleDateString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowSerialsListDialog(false)}
               className="border-slate-600 text-slate-300 hover:bg-slate-700"
             >
               Close

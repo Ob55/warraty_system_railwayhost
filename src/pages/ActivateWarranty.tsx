@@ -60,11 +60,12 @@ export default function ActivateWarranty() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.fullName || !formData.email || !formData.phone || !formData.productType) {
-      toast.error('Please fill in all required fields');
+    if (!formData.fullName || !formData.email || !formData.phone || !formData.productType || !formData.serialNumber) {
+      toast.error('Please fill in all required fields including serial number');
       return;
     }
 
+    // Disable submit button during validation
     setSubmitting(true);
 
     try {
@@ -187,15 +188,19 @@ export default function ActivateWarranty() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="serialNumber" className="text-slate-200">Serial Number</Label>
+                <Label htmlFor="serialNumber" className="text-slate-200">Serial Number *</Label>
                 <Input
                   id="serialNumber"
                   value={formData.serialNumber}
-                  onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
-                  placeholder="Enter serial number (optional)"
+                  onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value.toUpperCase() })}
+                  placeholder="Enter your product serial number"
                   className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500"
+                  required
                   disabled={!!product}
                 />
+                <p className="text-xs text-slate-500">
+                  The serial number is printed on your product label
+                </p>
               </div>
 
               <div className="flex gap-3 pt-2">
