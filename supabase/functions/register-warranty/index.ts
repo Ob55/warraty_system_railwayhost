@@ -17,6 +17,9 @@ interface RegisterWarrantyRequest {
 // Serial number format validation
 const SERIAL_FORMAT_REGEX = /^[A-Z0-9\-]{5,50}$/i;
 
+// Default warranty limit per phone number
+const DEFAULT_WARRANTY_LIMIT = 2;
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -44,6 +47,7 @@ Deno.serve(async (req) => {
     }
 
     const trimmedSerial = serialNumber.trim().toUpperCase()
+    const trimmedPhone = phone.trim()
 
     // Validate serial number format
     if (!SERIAL_FORMAT_REGEX.test(trimmedSerial)) {
@@ -82,6 +86,40 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Check phone number warranty limit
+    // First check if owner exists with this phone
+    const { data: existingOwnerByPhone, error: ownerPhoneCheckError } = await supabaseAdmin
+      .from('warranty_owners')
+      .select('*')
+      .eq('phone', trimmedPhone)
+      .maybeSingle()
+
+    if (ownerPhoneCheckError) {
+      console.error('Error checking owner by phone:', ownerPhoneCheckError)
+    }
+
+    if (existingOwnerByPhone) {
+      // Get the warranty limit for this phone number
+      const warrantyLimit = existingOwnerByPhone.warranty_limit || DEFAULT_WARRANTY_LIMIT
+
+      // Count existing warranties for this owner
+      const { count: existingWarrantiesCount, error: countError } = await supabaseAdmin
+        .from('warranties')
+        .select('*', { count: 'exact', head: true })
+        .eq('owner_id', existingOwnerByPhone.id)
+
+      if (countError) {
+        console.error('Error counting warranties:', countError)
+      } else if (existingWarrantiesCount !== null && existingWarrantiesCount >= warrantyLimit) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Your phone number has reached the maximum allowed warranties. Please contact support to increase your limit.' 
+          }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
     // Check if warranty owner already exists with this email
     let ownerId: string
     let accessCode: string
@@ -113,8 +151,9 @@ Deno.serve(async (req) => {
         .insert({
           full_name: fullName,
           email: email.toLowerCase(),
-          phone: phone,
-          access_code: accessCode
+          phone: trimmedPhone,
+          access_code: accessCode,
+          warranty_limit: DEFAULT_WARRANTY_LIMIT
         })
         .select()
         .single()

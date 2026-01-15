@@ -39,6 +39,17 @@ interface SerialNumber {
   used_at: string | null;
 }
 
+interface WarrantyOwner {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  access_code: string;
+  warranty_limit: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const { user, isAdmin, isLoading, signOut } = useAuth();
@@ -65,6 +76,11 @@ export default function AdminDashboard() {
   const [uploadingSerials, setUploadingSerials] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Delete serial confirmation
+  const [showDeleteSerialDialog, setShowDeleteSerialDialog] = useState(false);
+  const [serialToDelete, setSerialToDelete] = useState<SerialNumber | null>(null);
+  const [deletingSerial, setDeletingSerial] = useState(false);
+
   // Dialogs
   const [selectedWarranty, setSelectedWarranty] = useState<WarrantyWithDetails | null>(null);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
@@ -72,6 +88,10 @@ export default function AdminDashboard() {
   const [showQRDialog, setShowQRDialog] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [qrCodeUrl, setQrCodeUrl] = useState('');
+
+  // Warranty limit management
+  const [warrantyLimit, setWarrantyLimit] = useState<number>(2);
+  const [savingLimit, setSavingLimit] = useState(false);
 
   useEffect(() => {
     if (!isLoading && (!user || !isAdmin)) {
@@ -154,6 +174,9 @@ export default function AdminDashboard() {
 
   const handleViewWarranty = async (warranty: WarrantyWithDetails) => {
     setSelectedWarranty(warranty);
+    // Set the warranty limit from the owner
+    const owner = warranty.owner as WarrantyOwner;
+    setWarrantyLimit(owner.warranty_limit || 2);
     setShowDetailDialog(true);
 
     // Increment view count
@@ -171,6 +194,28 @@ export default function AdminDashboard() {
       }
     } catch (error) {
       console.error('Error updating view count:', error);
+    }
+  };
+
+  const handleSaveWarrantyLimit = async () => {
+    if (!selectedWarranty) return;
+
+    setSavingLimit(true);
+    try {
+      const { error } = await supabase
+        .from('warranty_owners')
+        .update({ warranty_limit: warrantyLimit })
+        .eq('id', selectedWarranty.owner.id);
+
+      if (error) throw error;
+
+      toast.success('Warranty limit updated successfully');
+      fetchData();
+    } catch (error: any) {
+      console.error('Error updating warranty limit:', error);
+      toast.error('Failed to update warranty limit');
+    } finally {
+      setSavingLimit(false);
     }
   };
 
@@ -251,6 +296,35 @@ export default function AdminDashboard() {
     } finally {
       setAddingSerial(false);
     }
+  };
+
+  const handleDeleteSerial = async () => {
+    if (!serialToDelete) return;
+
+    setDeletingSerial(true);
+    try {
+      const { error } = await supabase
+        .from('serial_numbers')
+        .delete()
+        .eq('id', serialToDelete.id);
+
+      if (error) throw error;
+
+      toast.success('Serial number deleted permanently');
+      setShowDeleteSerialDialog(false);
+      setSerialToDelete(null);
+      fetchData();
+    } catch (error: any) {
+      console.error('Error deleting serial:', error);
+      toast.error('Failed to delete serial number');
+    } finally {
+      setDeletingSerial(false);
+    }
+  };
+
+  const confirmDeleteSerial = (serial: SerialNumber) => {
+    setSerialToDelete(serial);
+    setShowDeleteSerialDialog(true);
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -622,6 +696,32 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
+              {/* Warranty Limit Override */}
+              <div className="pt-4 border-t border-slate-700">
+                <Label className="text-slate-400 text-sm">Warranty Limit (for this phone)</Label>
+                <div className="flex items-center gap-2 mt-2">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={warrantyLimit}
+                    onChange={(e) => setWarrantyLimit(parseInt(e.target.value) || 2)}
+                    className="w-24 bg-slate-700/50 border-slate-600 text-white"
+                  />
+                  <Button
+                    onClick={handleSaveWarrantyLimit}
+                    disabled={savingLimit}
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    {savingLimit ? 'Saving...' : 'Save Limit'}
+                  </Button>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Default is 2. Increase to allow more warranties for this phone number.
+                </p>
+              </div>
+
               {/* Progress */}
               <div className="space-y-2 pt-4 border-t border-slate-700">
                 <div className="flex justify-between text-sm">
@@ -660,7 +760,7 @@ export default function AdminDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Warranty Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent className="bg-slate-800 border-slate-700 text-white">
           <DialogHeader>
@@ -683,6 +783,42 @@ export default function AdminDashboard() {
               className="bg-red-600 hover:bg-red-700"
             >
               Delete Permanently
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Serial Number Confirmation Dialog */}
+      <Dialog open={showDeleteSerialDialog} onOpenChange={setShowDeleteSerialDialog}>
+        <DialogContent className="bg-slate-800 border-slate-700 text-white">
+          <DialogHeader>
+            <DialogTitle>Delete Serial Number</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Are you sure you want to permanently delete this serial number?
+              <br />
+              <span className="font-mono text-white">{serialToDelete?.serial_number}</span>
+              <br /><br />
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowDeleteSerialDialog(false);
+                setSerialToDelete(null);
+              }}
+              className="border-slate-600 text-slate-300 hover:bg-slate-700"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteSerial}
+              disabled={deletingSerial}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deletingSerial ? 'Deleting...' : 'Delete Permanently'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -809,7 +945,7 @@ export default function AdminDashboard() {
 
       {/* Serial Numbers List Dialog */}
       <Dialog open={showSerialsListDialog} onOpenChange={setShowSerialsListDialog}>
-        <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>All Serial Numbers</DialogTitle>
             <DialogDescription className="text-slate-400">
@@ -823,6 +959,7 @@ export default function AdminDashboard() {
                   <th className="text-left py-3 px-4 text-slate-400 font-medium">Serial Number</th>
                   <th className="text-left py-3 px-4 text-slate-400 font-medium">Status</th>
                   <th className="text-left py-3 px-4 text-slate-400 font-medium">Date Added</th>
+                  <th className="text-right py-3 px-4 text-slate-400 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -836,6 +973,16 @@ export default function AdminDashboard() {
                     </td>
                     <td className="py-3 px-4 text-slate-400 text-sm">
                       {new Date(serial.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <Button
+                        onClick={() => confirmDeleteSerial(serial)}
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </td>
                   </tr>
                 ))}
