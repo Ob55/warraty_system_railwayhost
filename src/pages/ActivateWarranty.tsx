@@ -87,7 +87,7 @@ export default function ActivateWarranty() {
       return 'Your phone number has reached the maximum allowed warranties. Please contact support to increase your limit.';
     }
     if (errorMessage.includes('Invalid serial') || errorMessage.includes('not found')) {
-      return 'Invalid serial number. Please check and try again.';
+      return 'Kindly check the serial number and try again.';
     }
     if (errorMessage.includes('already registered') || errorMessage.includes('already used') || errorMessage.includes('already been registered')) {
       return 'This serial number has already been registered.';
@@ -224,134 +224,138 @@ export default function ActivateWarranty() {
           </Card>
         </div>
 
-        <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-white text-lg">Product Registration</CardTitle>
-            <CardDescription className="text-slate-400 text-sm">
-              Fill in your details to activate your warranty
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <form onSubmit={handleSubmit} className="space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="fullName" className="text-slate-200 text-sm">Full Name *</Label>
-                <Input
-                  id="fullName"
-                  value={formData.fullName}
-                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                  placeholder="Enter your full name"
-                  className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 h-9"
-                  required
-                />
-              </div>
+        {/* Instructional message when policies not accepted */}
+        {!bothPoliciesAgreed && (
+          <Card className="bg-amber-500/10 border-amber-500/30 backdrop-blur-sm mb-4">
+            <CardContent className="py-4">
+              <p className="text-amber-400 text-sm text-center font-medium">
+                Kindly accept the Privacy Policy and Return & Refund Policy to proceed with product registration.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
-              <div className="space-y-1.5">
-                <Label htmlFor="email" className="text-slate-200 text-sm">Email Address *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="Enter your email"
-                  className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 h-9"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="phone" className="text-slate-200 text-sm">Phone Number *</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="Enter your phone number"
-                  className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 h-9"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="productType" className="text-slate-200 text-sm">Product Type *</Label>
-                <Select
-                  value={formData.productType}
-                  onValueChange={(value: ProductType) => setFormData({ ...formData, productType: value })}
-                  disabled={!!product}
-                >
-                  <SelectTrigger className="bg-slate-700/50 border-slate-600 text-white h-9">
-                    <SelectValue placeholder="Select product type" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-800 border-slate-700">
-                    <SelectItem value="EPC" className="text-white">EPC</SelectItem>
-                    <SelectItem value="LPG" className="text-white">LPG</SelectItem>
-                    <SelectItem value="OTHER" className="text-white">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="serialNumber" className="text-slate-200 text-sm">Serial Number *</Label>
-                <div className="flex">
-                  <div className="flex items-center bg-slate-600 border border-slate-600 rounded-l-md px-2 text-slate-300 text-xs font-mono">
-                    {SERIAL_PREFIX}
-                  </div>
+        {/* Product Registration Form - Only visible when both policies are accepted */}
+        {bothPoliciesAgreed && (
+          <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-white text-lg">Product Registration</CardTitle>
+              <CardDescription className="text-slate-400 text-sm">
+                Fill in your details to activate your warranty
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <form onSubmit={handleSubmit} className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="fullName" className="text-slate-200 text-sm">Full Name *</Label>
                   <Input
-                    id="serialNumber"
-                    value={formData.serialSuffix}
-                    onChange={handleSerialChange}
-                    placeholder="KE-001300"
-                    className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 rounded-l-none font-mono h-9"
+                    id="fullName"
+                    value={formData.fullName}
+                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                    placeholder="Enter your full name"
+                    className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 h-9"
                     required
-                    disabled={!!product}
                   />
                 </div>
-                <p className="text-xs text-slate-500">
-                  Enter the ending part of your serial number
-                </p>
-              </div>
 
-              <div className="flex gap-3 pt-3">
-                <Link to="/" className="flex-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full border-slate-600 text-slate-300 hover:bg-slate-700 h-9"
+                <div className="space-y-1.5">
+                  <Label htmlFor="email" className="text-slate-200 text-sm">Email Address *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="Enter your email"
+                    className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 h-9"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="phone" className="text-slate-200 text-sm">Phone Number *</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    placeholder="Enter your phone number"
+                    className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 h-9"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="productType" className="text-slate-200 text-sm">Product Type *</Label>
+                  <Select
+                    value={formData.productType}
+                    onValueChange={(value: ProductType) => setFormData({ ...formData, productType: value })}
+                    disabled={!!product}
                   >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Back
+                    <SelectTrigger className="bg-slate-700/50 border-slate-600 text-white h-9">
+                      <SelectValue placeholder="Select product type" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800 border-slate-700">
+                      <SelectItem value="EPC" className="text-white">EPC</SelectItem>
+                      <SelectItem value="LPG" className="text-white">LPG</SelectItem>
+                      <SelectItem value="OTHER" className="text-white">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="serialNumber" className="text-slate-200 text-sm">Serial Number *</Label>
+                  <div className="flex">
+                    <div className="flex items-center bg-slate-600 border border-slate-600 rounded-l-md px-2 text-slate-300 text-xs font-mono">
+                      {SERIAL_PREFIX}
+                    </div>
+                    <Input
+                      id="serialNumber"
+                      value={formData.serialSuffix}
+                      onChange={handleSerialChange}
+                      placeholder="KE-001300"
+                      className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 rounded-l-none font-mono h-9"
+                      required
+                      disabled={!!product}
+                    />
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Enter the ending part of your serial number
+                  </p>
+                </div>
+
+                <div className="flex gap-3 pt-3">
+                  <Link to="/" className="flex-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full border-slate-600 text-slate-300 hover:bg-slate-700 h-9"
+                    >
+                      <ArrowLeft className="w-4 h-4 mr-2" />
+                      Back
+                    </Button>
+                  </Link>
+                  <Button
+                    type="submit"
+                    disabled={submitting}
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white h-9"
+                  >
+                    {submitting ? (
+                      <span className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                        Registering...
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4" />
+                        Register Warranty
+                      </span>
+                    )}
                   </Button>
-                </Link>
-                <Button
-                  type="submit"
-                  disabled={submitting || !bothPoliciesAgreed}
-                  className={`flex-1 text-white h-9 ${
-                    bothPoliciesAgreed 
-                      ? 'bg-emerald-600 hover:bg-emerald-700' 
-                      : 'bg-slate-600 cursor-not-allowed'
-                  }`}
-                >
-                  {submitting ? (
-                    <span className="flex items-center gap-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
-                      Registering...
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4" />
-                      Register Warranty
-                    </span>
-                  )}
-                </Button>
-              </div>
-              
-              {!bothPoliciesAgreed && (
-                <p className="text-xs text-amber-400 text-center">
-                  Please agree to both policies above to continue
-                </p>
-              )}
-            </form>
-          </CardContent>
-        </Card>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Privacy Policy Dialog */}
