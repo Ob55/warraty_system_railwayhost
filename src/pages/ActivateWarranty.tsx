@@ -80,20 +80,31 @@ export default function ActivateWarranty() {
   };
 
   const parseErrorMessage = (error: any): string => {
-    const errorMessage = error?.message || error?.toString() || '';
+    const errorMessage = error?.message || error?.error || error?.toString() || '';
     
-    // Check for specific error patterns and return user-friendly messages
+    // Serial number errors - check first (highest priority)
+    if (errorMessage.includes('Serial number not found') || 
+        errorMessage.includes('check the serial number') ||
+        errorMessage.includes('Invalid serial') || 
+        errorMessage.includes('not found')) {
+      return 'Please check the serial number and try again.';
+    }
+    
+    // Already registered
+    if (errorMessage.includes('already registered') || 
+        errorMessage.includes('already used') || 
+        errorMessage.includes('already been registered')) {
+      return 'This serial number has already been registered.';
+    }
+    
+    // Phone limit
     if (errorMessage.includes('warranty limit') || errorMessage.includes('maximum allowed')) {
       return 'Your phone number has reached the maximum allowed warranties. Please contact support to increase your limit.';
     }
-    if (errorMessage.includes('Invalid serial') || errorMessage.includes('not found')) {
-      return 'Kindly check the serial number and try again.';
-    }
-    if (errorMessage.includes('already registered') || errorMessage.includes('already used') || errorMessage.includes('already been registered')) {
-      return 'This serial number has already been registered.';
-    }
+    
+    // Generic edge function error - only as last resort
     if (errorMessage.includes('non-2xx status code') || errorMessage.includes('edge function')) {
-      return 'Unable to process your request. Please try again or contact support.';
+      return 'Please check the serial number and try again.';
     }
     
     return errorMessage || 'Failed to register warranty. Please try again.';
@@ -134,15 +145,22 @@ export default function ActivateWarranty() {
         }
       });
 
-      if (response.error) {
-        const friendlyMessage = parseErrorMessage(response.error);
+      // Check for error in response data first (edge function custom errors)
+      if (response.data?.error) {
+        const friendlyMessage = parseErrorMessage({ message: response.data.error });
         throw new Error(friendlyMessage);
+      }
+
+      // Check for SDK-level errors (e.g., non-2xx status)
+      if (response.error) {
+        // For non-2xx errors, default to serial number message since that's the most common cause
+        throw new Error('Please check the serial number and try again.');
       }
 
       const data = response.data;
       
-      if (!data.success) {
-        const friendlyMessage = parseErrorMessage({ message: data.error });
+      if (!data?.success) {
+        const friendlyMessage = parseErrorMessage({ message: data?.error });
         throw new Error(friendlyMessage);
       }
 
