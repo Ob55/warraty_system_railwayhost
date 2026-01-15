@@ -99,7 +99,7 @@ export default function ActivateWarranty() {
     
     // Phone limit
     if (errorMessage.includes('warranty limit') || errorMessage.includes('maximum allowed')) {
-      return 'Your phone number has reached the maximum allowed warranties. Please contact support to increase your limit.';
+      return 'You have reached the maximum number of warranties for this phone number. Kindly contact us for assistance.';
     }
     
     // Generic edge function error - only as last resort
@@ -116,7 +116,7 @@ export default function ActivateWarranty() {
     // Check if both policies are agreed
     if (!privacyAgreed || !returnAgreed) {
       setGlowCards(true);
-      toast.error('Kindly check the Privacy Policy and Return & Refund Policy to proceed.');
+      toast.error('Kindly click the Privacy Policy and Return & Refund Policy checkboxes to agree to the policies and proceed with product registration.');
       setTimeout(() => setGlowCards(false), 2000);
       return;
     }
