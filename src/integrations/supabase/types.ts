@@ -154,6 +154,7 @@ export type Database = {
           id: string
           phone: string
           updated_at: string
+          warranty_limit: number
         }
         Insert: {
           access_code: string
@@ -163,6 +164,7 @@ export type Database = {
           id?: string
           phone: string
           updated_at?: string
+          warranty_limit?: number
         }
         Update: {
           access_code?: string
@@ -172,6 +174,7 @@ export type Database = {
           id?: string
           phone?: string
           updated_at?: string
+          warranty_limit?: number
         }
         Relationships: []
       }

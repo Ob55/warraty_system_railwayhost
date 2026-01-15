@@ -10,6 +10,8 @@ import { toast } from 'sonner';
 import { Shield, CheckCircle, ArrowLeft } from 'lucide-react';
 import type { Product, ProductType } from '@/lib/supabase-types';
 
+const SERIAL_PREFIX = 'IGN-EPC-6L-2601-';
+
 export default function ActivateWarranty() {
   const { productId } = useParams<{ productId: string }>();
   const navigate = useNavigate();
@@ -22,7 +24,7 @@ export default function ActivateWarranty() {
     email: '',
     phone: '',
     productType: '' as ProductType | '',
-    serialNumber: ''
+    serialSuffix: '' // Only the suffix part (after prefix)
   });
 
   useEffect(() => {
@@ -43,10 +45,15 @@ export default function ActivateWarranty() {
         toast.error('Failed to load product information');
       } else if (data) {
         setProduct(data as Product);
+        // If the serial number starts with the prefix, extract the suffix
+        const serialNumber = data.serial_number;
+        const suffix = serialNumber.startsWith(SERIAL_PREFIX) 
+          ? serialNumber.substring(SERIAL_PREFIX.length)
+          : serialNumber;
         setFormData(prev => ({
           ...prev,
           productType: data.product_type as ProductType,
-          serialNumber: data.serial_number
+          serialSuffix: suffix
         }));
       }
       setLoading(false);
@@ -55,12 +62,19 @@ export default function ActivateWarranty() {
     fetchProduct();
   }, [productId]);
 
-  // Access code generation is now handled by backend
+  const handleSerialChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Allow only uppercase alphanumeric and hyphens for suffix
+    const value = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+    setFormData({ ...formData, serialSuffix: value });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.fullName || !formData.email || !formData.phone || !formData.productType || !formData.serialNumber) {
+    // Combine prefix and suffix to get full serial number
+    const fullSerialNumber = SERIAL_PREFIX + formData.serialSuffix;
+    
+    if (!formData.fullName || !formData.email || !formData.phone || !formData.productType || !formData.serialSuffix) {
       toast.error('Please fill in all required fields including serial number');
       return;
     }
@@ -76,7 +90,7 @@ export default function ActivateWarranty() {
           email: formData.email,
           phone: formData.phone,
           productType: formData.productType,
-          serialNumber: formData.serialNumber,
+          serialNumber: fullSerialNumber,
           productId: productId
         }
       });
@@ -189,17 +203,22 @@ export default function ActivateWarranty() {
 
               <div className="space-y-2">
                 <Label htmlFor="serialNumber" className="text-slate-200">Serial Number *</Label>
-                <Input
-                  id="serialNumber"
-                  value={formData.serialNumber}
-                  onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value.toUpperCase() })}
-                  placeholder="Enter your product serial number"
-                  className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500"
-                  required
-                  disabled={!!product}
-                />
+                <div className="flex">
+                  <div className="flex items-center bg-slate-600 border border-slate-600 rounded-l-md px-3 text-slate-300 text-sm font-mono">
+                    {SERIAL_PREFIX}
+                  </div>
+                  <Input
+                    id="serialNumber"
+                    value={formData.serialSuffix}
+                    onChange={handleSerialChange}
+                    placeholder="KE-001300"
+                    className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 rounded-l-none font-mono"
+                    required
+                    disabled={!!product}
+                  />
+                </div>
                 <p className="text-xs text-slate-500">
-                  The serial number is printed on your product label
+                  The serial number is printed on your product label (e.g., {SERIAL_PREFIX}KE-001300)
                 </p>
               </div>
 
