@@ -21,11 +21,10 @@ export default function Index() {
             <Shield className="w-10 h-10 text-emerald-400" />
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-            Activate Warrant
+            Activate Warranty
           </h1>
           <p className="text-xl text-slate-400 max-w-2xl mx-auto">
-            Register, track, and manage your product warranties with ease. 
-            Scan a QR code or enter your access details to get started.
+            Welcome to the IGNIS Warranty Page — here we ensure your product is fully protected and supported.
           </p>
         </div>
 
@@ -89,10 +88,10 @@ export default function Index() {
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Link to="/activate-warranty">
+          <Link to="/activate-warranty" state={{ privacyAgreed, returnAgreed }}>
             <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white px-8">
               <QrCode className="w-5 h-5 mr-2" />
-              Activate Warrant
+              Activate Warranty
             </Button>
           </Link>
           <Link to="/my-warranty">
