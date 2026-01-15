@@ -223,20 +223,47 @@ export default function AdminDashboard() {
     if (!selectedWarranty) return;
 
     try {
-      const { error } = await supabase
+      // Step 1: Reset any serial numbers linked to this warranty
+      const { error: serialError } = await supabase
+        .from('serial_numbers')
+        .update({ 
+          warranty_id: null, 
+          status: 'unused',
+          used_at: null 
+        })
+        .eq('warranty_id', selectedWarranty.id);
+
+      if (serialError) {
+        console.error('Error resetting serial number:', serialError);
+        // Continue anyway - the serial might not exist
+      }
+
+      // Step 2: Delete the product associated with the warranty
+      const { error: productError } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', selectedWarranty.product.id);
+
+      if (productError) {
+        console.error('Error deleting product:', productError);
+        // Continue anyway
+      }
+
+      // Step 3: Delete the warranty
+      const { error: warrantyError } = await supabase
         .from('warranties')
         .delete()
         .eq('id', selectedWarranty.id);
 
-      if (error) throw error;
+      if (warrantyError) throw warrantyError;
 
-      toast.success('Warranty deleted permanently');
+      toast.success('Warranty deleted successfully.');
       setShowDeleteDialog(false);
       setShowDetailDialog(false);
       fetchData();
     } catch (error: any) {
       console.error('Error deleting warranty:', error);
-      toast.error('Failed to delete warranty');
+      toast.error('Failed to delete warranty. Please try again.');
     }
   };
 
