@@ -107,7 +107,7 @@ export default function AdminDashboard() {
   const [savingCustomLimit, setSavingCustomLimit] = useState(false);
 
   // Phone limits table
-  const [phoneLimits, setPhoneLimits] = useState<Array<{phone: string, limit: number}>>([]);
+  const [phoneLimits, setPhoneLimits] = useState<Array<{phone: string, limit: number, used: number}>>([]);
   const [editingPhone, setEditingPhone] = useState<string | null>(null);
   const [editingLimitValue, setEditingLimitValue] = useState<number>(2);
   const [loadingPhoneLimits, setLoadingPhoneLimits] = useState(false);
@@ -218,24 +218,50 @@ export default function AdminDashboard() {
       // Get distinct phone numbers with their max warranty_limit
       const { data, error } = await supabase
         .from('warranty_owners')
-        .select('phone, warranty_limit')
+        .select('id, phone, warranty_limit')
         .order('phone');
       
       if (error) throw error;
       
-      // Group by phone and take the highest limit
-      const phoneMap = new Map<string, number>();
+      // Group by phone and take the highest limit, collect owner IDs
+      const phoneMap = new Map<string, { limit: number, ownerIds: string[] }>();
       data?.forEach(owner => {
-        const currentMax = phoneMap.get(owner.phone) || 0;
-        if (owner.warranty_limit > currentMax) {
-          phoneMap.set(owner.phone, owner.warranty_limit);
+        const existing = phoneMap.get(owner.phone);
+        if (existing) {
+          if (owner.warranty_limit > existing.limit) {
+            existing.limit = owner.warranty_limit;
+          }
+          existing.ownerIds.push(owner.id);
+        } else {
+          phoneMap.set(owner.phone, { 
+            limit: owner.warranty_limit, 
+            ownerIds: [owner.id] 
+          });
         }
       });
       
-      // Convert to array and filter only those with custom limits (> 2)
-      const customLimits = Array.from(phoneMap.entries())
-        .filter(([_, limit]) => limit > 2)
-        .map(([phone, limit]) => ({ phone, limit }));
+      // Fetch all warranties to count usage per phone
+      const { data: warrantiesData, error: warrantiesError } = await supabase
+        .from('warranties')
+        .select('owner_id');
+      
+      if (warrantiesError) throw warrantiesError;
+      
+      // Count warranties per phone number
+      const customLimits: Array<{phone: string, limit: number, used: number}> = [];
+      
+      phoneMap.forEach((value, phone) => {
+        if (value.limit > 2) {  // Only show custom limits
+          const usedCount = warrantiesData?.filter(w => 
+            value.ownerIds.includes(w.owner_id)
+          ).length || 0;
+          
+          customLimits.push({ phone, limit: value.limit, used: usedCount });
+        }
+      });
+      
+      // Sort by phone number
+      customLimits.sort((a, b) => a.phone.localeCompare(b.phone));
       
       setPhoneLimits(customLimits);
     } catch (error) {
@@ -781,11 +807,12 @@ export default function AdminDashboard() {
                       <TableRow className="border-slate-700">
                         <TableHead className="text-slate-300">Phone Number</TableHead>
                         <TableHead className="text-slate-300">Current Limit</TableHead>
+                        <TableHead className="text-slate-300">Currently Linked</TableHead>
                         <TableHead className="text-slate-300">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {phoneLimits.map(({ phone, limit }) => (
+                      {phoneLimits.map(({ phone, limit, used }) => (
                         <TableRow key={phone} className="border-slate-700">
                           <TableCell className="text-white font-mono">{phone}</TableCell>
                           <TableCell>
@@ -803,6 +830,11 @@ export default function AdminDashboard() {
                                 {limit}
                               </Badge>
                             )}
+                          </TableCell>
+                          <TableCell>
+                            <span className={`font-medium ${used >= limit ? 'text-red-400' : 'text-emerald-400'}`}>
+                              {used} / {limit}
+                            </span>
                           </TableCell>
                           <TableCell>
                             {editingPhone === phone ? (
