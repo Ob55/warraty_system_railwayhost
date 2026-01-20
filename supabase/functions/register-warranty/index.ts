@@ -17,7 +17,7 @@ interface RegisterWarrantyRequest {
 // Serial number format validation
 const SERIAL_FORMAT_REGEX = /^[A-Z0-9\-]{5,50}$/i;
 
-// Default warranty limit per phone number
+// Default warranty limit per phone number (fallback if not set in DB)
 const DEFAULT_WARRANTY_LIMIT = 2;
 
 Deno.serve(async (req) => {
@@ -86,38 +86,54 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Check phone number warranty limit
-    // First check if owner exists with this phone
-    const { data: existingOwnerByPhone, error: ownerPhoneCheckError } = await supabaseAdmin
-      .from('warranty_owners')
-      .select('*')
-      .eq('phone', trimmedPhone)
+    // Fetch global default warranty limit from settings table
+    const { data: settingsData } = await supabaseAdmin
+      .from('settings')
+      .select('value')
+      .eq('key', 'default_warranty_limit')
       .maybeSingle()
 
-    if (ownerPhoneCheckError) {
-      console.error('Error checking owner by phone:', ownerPhoneCheckError)
+    const globalDefaultLimit = settingsData ? parseInt(settingsData.value) : DEFAULT_WARRANTY_LIMIT
+    console.log('Global warranty limit:', globalDefaultLimit)
+
+    // Check phone number warranty limit - count ALL warranties across ALL owners with this phone
+    // This prevents bypass by using different emails with the same phone number
+    const { data: ownersWithPhone, error: ownersPhoneError } = await supabaseAdmin
+      .from('warranty_owners')
+      .select('id')
+      .eq('phone', trimmedPhone)
+
+    if (ownersPhoneError) {
+      console.error('Error fetching owners by phone:', ownersPhoneError)
     }
 
-    if (existingOwnerByPhone) {
-      // Get the warranty limit for this phone number
-      const warrantyLimit = existingOwnerByPhone.warranty_limit || DEFAULT_WARRANTY_LIMIT
+    // Count total warranties for this phone number across all owner accounts
+    const ownerIds = ownersWithPhone?.map(o => o.id) || []
+    let totalWarrantiesForPhone = 0
 
-      // Count existing warranties for this owner
-      const { count: existingWarrantiesCount, error: countError } = await supabaseAdmin
+    if (ownerIds.length > 0) {
+      const { count, error: countError } = await supabaseAdmin
         .from('warranties')
         .select('*', { count: 'exact', head: true })
-        .eq('owner_id', existingOwnerByPhone.id)
+        .in('owner_id', ownerIds)
 
       if (countError) {
         console.error('Error counting warranties:', countError)
-      } else if (existingWarrantiesCount !== null && existingWarrantiesCount >= warrantyLimit) {
-        return new Response(
-          JSON.stringify({ 
-            error: 'Your phone number has reached the maximum allowed warranties. Please contact support to increase your limit.' 
-          }),
-          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+      } else {
+        totalWarrantiesForPhone = count || 0
       }
+    }
+
+    console.log(`Phone ${trimmedPhone} has ${totalWarrantiesForPhone} warranties, limit is ${globalDefaultLimit}`)
+
+    // Check if phone has reached the warranty limit
+    if (totalWarrantiesForPhone >= globalDefaultLimit) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'You have reached the maximum number of warranties for this phone number. Kindly contact customer care for assistance.' 
+        }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     // Check if warranty owner already exists with this email
@@ -153,7 +169,7 @@ Deno.serve(async (req) => {
           email: email.toLowerCase(),
           phone: trimmedPhone,
           access_code: accessCode,
-          warranty_limit: DEFAULT_WARRANTY_LIMIT
+          warranty_limit: globalDefaultLimit
         })
         .select()
         .single()
