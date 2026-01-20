@@ -89,9 +89,13 @@ export default function AdminDashboard() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [qrCodeUrl, setQrCodeUrl] = useState('');
 
-  // Warranty limit management
+  // Warranty limit management (per owner in detail dialog)
   const [warrantyLimit, setWarrantyLimit] = useState<number>(2);
   const [savingLimit, setSavingLimit] = useState(false);
+
+  // Global warranty limit setting
+  const [globalWarrantyLimit, setGlobalWarrantyLimit] = useState<number>(2);
+  const [savingGlobalLimit, setSavingGlobalLimit] = useState(false);
 
   useEffect(() => {
     if (!isLoading && (!user || !isAdmin)) {
@@ -164,11 +168,43 @@ export default function AdminDashboard() {
         setUnusedSerials(serials.filter(s => s.status === 'unused').length);
       }
 
+      // Fetch global warranty limit setting
+      const { data: settingsData, error: settingsError } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'default_warranty_limit')
+        .maybeSingle();
+
+      if (settingsError) {
+        console.error('Error fetching settings:', settingsError);
+      } else if (settingsData) {
+        setGlobalWarrantyLimit(parseInt(settingsData.value) || 2);
+      }
+
     } catch (error: any) {
       console.error('Error fetching data:', error);
       toast.error('Failed to load data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveGlobalWarrantyLimit = async () => {
+    setSavingGlobalLimit(true);
+    try {
+      const { error } = await supabase
+        .from('settings')
+        .update({ value: globalWarrantyLimit.toString() })
+        .eq('key', 'default_warranty_limit');
+
+      if (error) throw error;
+
+      toast.success('Global warranty limit updated successfully');
+    } catch (error: any) {
+      console.error('Error updating global warranty limit:', error);
+      toast.error('Failed to update global warranty limit');
+    } finally {
+      setSavingGlobalLimit(false);
     }
   };
 
@@ -535,6 +571,45 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Global Warranty Limit Setting */}
+        <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm mb-6">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2">
+              <Shield className="w-5 h-5" />
+              Warranty Limit Per Phone Number
+            </CardTitle>
+            <CardDescription className="text-slate-400">
+              Set the maximum number of warranties allowed per phone number for new registrations
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="globalLimit" className="text-slate-300">Default Limit:</Label>
+                <Input
+                  id="globalLimit"
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={globalWarrantyLimit}
+                  onChange={(e) => setGlobalWarrantyLimit(parseInt(e.target.value) || 2)}
+                  className="w-20 bg-slate-700/50 border-slate-600 text-white"
+                />
+              </div>
+              <Button
+                onClick={handleSaveGlobalWarrantyLimit}
+                disabled={savingGlobalLimit}
+                className="bg-amber-600 hover:bg-amber-700 text-white"
+              >
+                {savingGlobalLimit ? 'Saving...' : 'Save'}
+              </Button>
+              <span className="text-sm text-slate-400">
+                (Currently: {globalWarrantyLimit} warranties per phone number)
+              </span>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Serial Number Management */}
         <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm mb-6">

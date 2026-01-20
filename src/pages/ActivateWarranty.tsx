@@ -98,8 +98,8 @@ export default function ActivateWarranty() {
     }
     
     // Phone limit
-    if (errorMessage.includes('warranty limit') || errorMessage.includes('maximum allowed')) {
-      return 'You have reached the maximum number of warranties for this phone number. Kindly contact us for assistance.';
+    if (errorMessage.includes('warranty limit') || errorMessage.includes('maximum allowed') || errorMessage.includes('maximum number of warranties')) {
+      return 'You have reached the maximum number of warranties for this phone number. Kindly contact customer care for assistance.';
     }
     
     // Generic edge function error - only as last resort
