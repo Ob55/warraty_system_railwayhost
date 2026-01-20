@@ -94,18 +94,28 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     const globalDefaultLimit = settingsData ? parseInt(settingsData.value) : DEFAULT_WARRANTY_LIMIT
-    console.log('Global warranty limit:', globalDefaultLimit)
+    console.log('Global default warranty limit:', globalDefaultLimit)
 
-    // Check phone number warranty limit - count ALL warranties across ALL owners with this phone
-    // This prevents bypass by using different emails with the same phone number
+    // Check if phone number has a custom limit set by admin
+    // Get all owners with this phone and find the highest custom limit
     const { data: ownersWithPhone, error: ownersPhoneError } = await supabaseAdmin
       .from('warranty_owners')
-      .select('id')
+      .select('id, warranty_limit')
       .eq('phone', trimmedPhone)
 
     if (ownersPhoneError) {
       console.error('Error fetching owners by phone:', ownersPhoneError)
     }
+
+    // Determine effective limit: use custom limit if set, otherwise use global default
+    let effectiveLimit = globalDefaultLimit
+    if (ownersWithPhone && ownersWithPhone.length > 0) {
+      // Find the maximum warranty_limit among all owners with this phone
+      const maxCustomLimit = Math.max(...ownersWithPhone.map(o => o.warranty_limit || globalDefaultLimit))
+      effectiveLimit = maxCustomLimit
+    }
+
+    console.log(`Effective warranty limit for phone ${trimmedPhone}: ${effectiveLimit}`)
 
     // Count total warranties for this phone number across all owner accounts
     const ownerIds = ownersWithPhone?.map(o => o.id) || []
@@ -124,10 +134,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`Phone ${trimmedPhone} has ${totalWarrantiesForPhone} warranties, limit is ${globalDefaultLimit}`)
+    console.log(`Phone ${trimmedPhone} has ${totalWarrantiesForPhone} warranties, effective limit is ${effectiveLimit}`)
 
     // Check if phone has reached the warranty limit
-    if (totalWarrantiesForPhone >= globalDefaultLimit) {
+    if (totalWarrantiesForPhone >= effectiveLimit) {
       return new Response(
         JSON.stringify({ 
           error: 'You have reached the maximum number of warranties for this phone number. Kindly contact customer care for assistance.' 
