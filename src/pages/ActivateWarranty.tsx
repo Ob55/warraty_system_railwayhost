@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { FunctionsHttpError, FunctionsRelayError, FunctionsFetchError } from '@supabase/supabase-js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -155,33 +156,19 @@ export default function ActivateWarranty() {
       if (response.error) {
         let errorMessage = '';
         
-        // Method 1: Try to parse response.error.message as JSON (SDK often stores body here)
-        try {
-          const parsed = JSON.parse(response.error.message);
-          errorMessage = parsed.error || '';
-        } catch {
-          // Not JSON, check if it contains error keywords directly
-          if (response.error.message) {
-            errorMessage = response.error.message;
-          }
-        }
-        
-        // Method 2: Try context body if available (handle as Response object)
-        if (!errorMessage && response.error.context?.body) {
+        // FunctionsHttpError means the edge function returned non-2xx
+        // Use error.context.json() to get the actual JSON body
+        if (response.error instanceof FunctionsHttpError) {
           try {
-            if (response.error.context.body instanceof Response) {
-              const cloned = response.error.context.body.clone();
-              const bodyText = await cloned.text();
-              const parsed = JSON.parse(bodyText);
-              errorMessage = parsed.error || '';
-            } else if (typeof response.error.context.body.text === 'function') {
-              const bodyText = await response.error.context.body.text();
-              const parsed = JSON.parse(bodyText);
-              errorMessage = parsed.error || '';
-            }
+            const errorData = await response.error.context.json();
+            errorMessage = errorData.error || '';
           } catch {
-            // Fallback if parsing fails
+            // Fallback if JSON parsing fails
           }
+        } else if (response.error instanceof FunctionsRelayError) {
+          errorMessage = response.error.message;
+        } else if (response.error instanceof FunctionsFetchError) {
+          errorMessage = response.error.message;
         }
         
         // If we got an error message, parse it for user-friendly version
