@@ -153,7 +153,27 @@ export default function ActivateWarranty() {
 
       // Check for SDK-level errors (e.g., non-2xx status)
       if (response.error) {
-        // For non-2xx errors, default to serial number message since that's the most common cause
+        // Try to extract the actual error message from the SDK error
+        let errorMessage = '';
+        
+        // The error context may contain the actual response body
+        if (response.error.context?.body) {
+          try {
+            const bodyText = await response.error.context.body.text();
+            const parsed = JSON.parse(bodyText);
+            errorMessage = parsed.error || '';
+          } catch {
+            // Fallback if parsing fails
+          }
+        }
+        
+        // If we got an error message, parse it for user-friendly version
+        if (errorMessage) {
+          const friendlyMessage = parseErrorMessage({ message: errorMessage });
+          throw new Error(friendlyMessage);
+        }
+        
+        // Only use generic fallback if we couldn't extract the real message
         throw new Error('Please check the serial number and try again.');
       }
 
