@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -105,6 +106,12 @@ export default function AdminDashboard() {
   const [customLimitValue, setCustomLimitValue] = useState<number>(3);
   const [savingCustomLimit, setSavingCustomLimit] = useState(false);
 
+  // Phone limits table
+  const [phoneLimits, setPhoneLimits] = useState<Array<{phone: string, limit: number}>>([]);
+  const [editingPhone, setEditingPhone] = useState<string | null>(null);
+  const [editingLimitValue, setEditingLimitValue] = useState<number>(2);
+  const [loadingPhoneLimits, setLoadingPhoneLimits] = useState(false);
+
   // Warranties by phone number
   const [showPhoneGroupDialog, setShowPhoneGroupDialog] = useState(false);
   const [expandedPhones, setExpandedPhones] = useState<Set<string>>(new Set());
@@ -194,11 +201,47 @@ export default function AdminDashboard() {
         setGlobalWarrantyLimit(parseInt(settingsData.value) || 2);
       }
 
+      // Fetch phone limits
+      await fetchPhoneLimits();
+
     } catch (error: any) {
       console.error('Error fetching data:', error);
       toast.error('Failed to load data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPhoneLimits = async () => {
+    setLoadingPhoneLimits(true);
+    try {
+      // Get distinct phone numbers with their max warranty_limit
+      const { data, error } = await supabase
+        .from('warranty_owners')
+        .select('phone, warranty_limit')
+        .order('phone');
+      
+      if (error) throw error;
+      
+      // Group by phone and take the highest limit
+      const phoneMap = new Map<string, number>();
+      data?.forEach(owner => {
+        const currentMax = phoneMap.get(owner.phone) || 0;
+        if (owner.warranty_limit > currentMax) {
+          phoneMap.set(owner.phone, owner.warranty_limit);
+        }
+      });
+      
+      // Convert to array and filter only those with custom limits (> 2)
+      const customLimits = Array.from(phoneMap.entries())
+        .filter(([_, limit]) => limit > 2)
+        .map(([phone, limit]) => ({ phone, limit }));
+      
+      setPhoneLimits(customLimits);
+    } catch (error) {
+      console.error('Error fetching phone limits:', error);
+    } finally {
+      setLoadingPhoneLimits(false);
     }
   };
 
@@ -235,13 +278,46 @@ export default function AdminDashboard() {
       toast.success(`Custom limit of ${customLimitValue} set for phone ${customLimitPhone}`);
       setCustomLimitPhone('');
       setCustomLimitValue(3);
-      fetchData();
+      await fetchPhoneLimits();
     } catch (error: any) {
       console.error('Error setting custom limit:', error);
       toast.error('Failed to set custom limit');
     } finally {
       setSavingCustomLimit(false);
     }
+  };
+
+  const handleEditPhoneLimit = (phone: string, currentLimit: number) => {
+    setEditingPhone(phone);
+    setEditingLimitValue(currentLimit);
+  };
+
+  const handleSaveEditedLimit = async () => {
+    if (!editingPhone) return;
+    
+    setSavingCustomLimit(true);
+    try {
+      const { error } = await supabase
+        .from('warranty_owners')
+        .update({ warranty_limit: editingLimitValue })
+        .eq('phone', editingPhone);
+      
+      if (error) throw error;
+      
+      toast.success(`Limit updated to ${editingLimitValue} for ${editingPhone}`);
+      setEditingPhone(null);
+      await fetchPhoneLimits();
+    } catch (error: any) {
+      console.error('Error updating limit:', error);
+      toast.error('Failed to update limit');
+    } finally {
+      setSavingCustomLimit(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingPhone(null);
+    setEditingLimitValue(2);
   };
 
   const handleViewWarranty = async (warranty: WarrantyWithDetails) => {
@@ -637,53 +713,135 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {/* Add Custom Limit for a Phone Number */}
+        {/* Add / Manage Warranty Limits by Phone Number */}
         <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm mb-6">
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2">
               <Shield className="w-5 h-5" />
-              Add Warranty Limit for a Phone Number
+              Add / Manage Warranty Limits by Phone Number
             </CardTitle>
             <CardDescription className="text-slate-400">
-              Set a custom warranty limit for a specific phone number. Users without a custom limit will use the default of 2.
+              Set custom warranty limits for specific phone numbers. Default limit is 2 warranties per phone.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-              <div className="space-y-2">
-                <Label htmlFor="customLimitPhone" className="text-slate-300">Phone Number</Label>
-                <Input
-                  id="customLimitPhone"
-                  type="tel"
-                  placeholder="e.g., 0723233398"
-                  value={customLimitPhone}
-                  onChange={(e) => setCustomLimitPhone(e.target.value)}
-                  className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500"
-                />
+          <CardContent className="space-y-6">
+            {/* Add New Limit Section */}
+            <div className="border-b border-slate-700 pb-6">
+              <h3 className="text-white font-medium mb-4">Add or Update a Limit</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div className="space-y-2">
+                  <Label htmlFor="customLimitPhone" className="text-slate-300">Phone Number</Label>
+                  <Input
+                    id="customLimitPhone"
+                    type="tel"
+                    placeholder="e.g., 0723233398"
+                    value={customLimitPhone}
+                    onChange={(e) => setCustomLimitPhone(e.target.value)}
+                    className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="customLimitValue" className="text-slate-300">Set Limit</Label>
+                  <Input
+                    id="customLimitValue"
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={customLimitValue}
+                    onChange={(e) => setCustomLimitValue(parseInt(e.target.value) || 3)}
+                    className="bg-slate-700/50 border-slate-600 text-white w-24"
+                  />
+                </div>
+                <Button
+                  onClick={handleSaveCustomPhoneLimit}
+                  disabled={savingCustomLimit}
+                  className="bg-amber-600 hover:bg-amber-700 text-white"
+                >
+                  {savingCustomLimit ? 'Saving...' : 'Save Limit'}
+                </Button>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="customLimitValue" className="text-slate-300">Custom Limit</Label>
-                <Input
-                  id="customLimitValue"
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={customLimitValue}
-                  onChange={(e) => setCustomLimitValue(parseInt(e.target.value) || 3)}
-                  className="bg-slate-700/50 border-slate-600 text-white w-24"
-                />
-              </div>
-              <Button
-                onClick={handleSaveCustomPhoneLimit}
-                disabled={savingCustomLimit}
-                className="bg-amber-600 hover:bg-amber-700 text-white"
-              >
-                {savingCustomLimit ? 'Saving...' : 'Save Limit'}
-              </Button>
+              <p className="text-sm text-slate-500 mt-2">
+                If the phone number already exists, its limit will be updated. New numbers will be added when they register a warranty.
+              </p>
             </div>
-            <p className="text-sm text-slate-500">
-              Default limit for new users: 2 warranties per phone number
-            </p>
+
+            {/* Phone Limits Table */}
+            <div>
+              <h3 className="text-white font-medium mb-4">Phone Numbers with Custom Limits</h3>
+              {loadingPhoneLimits ? (
+                <div className="text-slate-400 text-center py-4">Loading...</div>
+              ) : phoneLimits.length === 0 ? (
+                <div className="text-slate-400 text-center py-4 bg-slate-700/30 rounded-lg">
+                  No custom limits set. All phone numbers use the default limit of 2.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-slate-700">
+                        <TableHead className="text-slate-300">Phone Number</TableHead>
+                        <TableHead className="text-slate-300">Current Limit</TableHead>
+                        <TableHead className="text-slate-300">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {phoneLimits.map(({ phone, limit }) => (
+                        <TableRow key={phone} className="border-slate-700">
+                          <TableCell className="text-white font-mono">{phone}</TableCell>
+                          <TableCell>
+                            {editingPhone === phone ? (
+                              <Input
+                                type="number"
+                                min={1}
+                                max={20}
+                                value={editingLimitValue}
+                                onChange={(e) => setEditingLimitValue(parseInt(e.target.value) || 2)}
+                                className="bg-slate-700/50 border-slate-600 text-white w-20"
+                              />
+                            ) : (
+                              <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/50">
+                                {limit}
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {editingPhone === phone ? (
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={handleSaveEditedLimit}
+                                  disabled={savingCustomLimit}
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                >
+                                  {savingCustomLimit ? 'Saving...' : 'Save'}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={handleCancelEdit}
+                                  className="text-slate-400 hover:text-white"
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleEditPhoneLimit(phone, limit)}
+                                className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/20"
+                              >
+                                Edit
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
