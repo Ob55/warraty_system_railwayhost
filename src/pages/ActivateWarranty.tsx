@@ -153,15 +153,32 @@ export default function ActivateWarranty() {
 
       // Check for SDK-level errors (e.g., non-2xx status)
       if (response.error) {
-        // Try to extract the actual error message from the SDK error
         let errorMessage = '';
         
-        // The error context may contain the actual response body
-        if (response.error.context?.body) {
+        // Method 1: Try to parse response.error.message as JSON (SDK often stores body here)
+        try {
+          const parsed = JSON.parse(response.error.message);
+          errorMessage = parsed.error || '';
+        } catch {
+          // Not JSON, check if it contains error keywords directly
+          if (response.error.message) {
+            errorMessage = response.error.message;
+          }
+        }
+        
+        // Method 2: Try context body if available (handle as Response object)
+        if (!errorMessage && response.error.context?.body) {
           try {
-            const bodyText = await response.error.context.body.text();
-            const parsed = JSON.parse(bodyText);
-            errorMessage = parsed.error || '';
+            if (response.error.context.body instanceof Response) {
+              const cloned = response.error.context.body.clone();
+              const bodyText = await cloned.text();
+              const parsed = JSON.parse(bodyText);
+              errorMessage = parsed.error || '';
+            } else if (typeof response.error.context.body.text === 'function') {
+              const bodyText = await response.error.context.body.text();
+              const parsed = JSON.parse(bodyText);
+              errorMessage = parsed.error || '';
+            }
           } catch {
             // Fallback if parsing fails
           }
@@ -174,7 +191,7 @@ export default function ActivateWarranty() {
         }
         
         // Only use generic fallback if we couldn't extract the real message
-        throw new Error('Please check the serial number and try again.');
+        throw new Error('An error occurred. Please try again.');
       }
 
       const data = response.data;
