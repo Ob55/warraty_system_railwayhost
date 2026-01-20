@@ -100,6 +100,11 @@ export default function AdminDashboard() {
   // Global warranty limit setting
   const [globalWarrantyLimit, setGlobalWarrantyLimit] = useState<number>(2);
 
+  // Custom phone limit
+  const [customLimitPhone, setCustomLimitPhone] = useState('');
+  const [customLimitValue, setCustomLimitValue] = useState<number>(3);
+  const [savingCustomLimit, setSavingCustomLimit] = useState(false);
+
   // Warranties by phone number
   const [showPhoneGroupDialog, setShowPhoneGroupDialog] = useState(false);
   const [expandedPhones, setExpandedPhones] = useState<Set<string>>(new Set());
@@ -197,22 +202,45 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleSaveGlobalWarrantyLimit = async () => {
-    setSavingGlobalLimit(true);
+  const handleSaveCustomPhoneLimit = async () => {
+    if (!customLimitPhone.trim()) {
+      toast.error('Please enter a phone number');
+      return;
+    }
+    
+    setSavingCustomLimit(true);
     try {
+      // Check if any warranty owner exists with this phone number
+      const { data: owners, error: findError } = await supabase
+        .from('warranty_owners')
+        .select('id')
+        .eq('phone', customLimitPhone.trim());
+      
+      if (findError) throw findError;
+      
+      if (!owners || owners.length === 0) {
+        toast.error('No warranty owner found with this phone number');
+        setSavingCustomLimit(false);
+        return;
+      }
+      
+      // Update ALL owners with this phone number to have the custom limit
       const { error } = await supabase
-        .from('settings')
-        .update({ value: globalWarrantyLimit.toString() })
-        .eq('key', 'default_warranty_limit');
-
+        .from('warranty_owners')
+        .update({ warranty_limit: customLimitValue })
+        .eq('phone', customLimitPhone.trim());
+      
       if (error) throw error;
-
-      toast.success('Global warranty limit updated successfully');
+      
+      toast.success(`Custom limit of ${customLimitValue} set for phone ${customLimitPhone}`);
+      setCustomLimitPhone('');
+      setCustomLimitValue(3);
+      fetchData();
     } catch (error: any) {
-      console.error('Error updating global warranty limit:', error);
-      toast.error('Failed to update global warranty limit');
+      console.error('Error setting custom limit:', error);
+      toast.error('Failed to set custom limit');
     } finally {
-      setSavingGlobalLimit(false);
+      setSavingCustomLimit(false);
     }
   };
 
@@ -609,42 +637,53 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {/* Global Warranty Limit Setting */}
+        {/* Add Custom Limit for a Phone Number */}
         <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm mb-6">
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2">
               <Shield className="w-5 h-5" />
-              Warranty Limit Per Phone Number
+              Add Warranty Limit for a Phone Number
             </CardTitle>
             <CardDescription className="text-slate-400">
-              Set the maximum number of warranties allowed per phone number for new registrations
+              Set a custom warranty limit for a specific phone number. Users without a custom limit will use the default of 2.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Label htmlFor="globalLimit" className="text-slate-300">Default Limit:</Label>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+              <div className="space-y-2">
+                <Label htmlFor="customLimitPhone" className="text-slate-300">Phone Number</Label>
                 <Input
-                  id="globalLimit"
+                  id="customLimitPhone"
+                  type="tel"
+                  placeholder="e.g., 0723233398"
+                  value={customLimitPhone}
+                  onChange={(e) => setCustomLimitPhone(e.target.value)}
+                  className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="customLimitValue" className="text-slate-300">Custom Limit</Label>
+                <Input
+                  id="customLimitValue"
                   type="number"
                   min={1}
-                  max={10}
-                  value={globalWarrantyLimit}
-                  onChange={(e) => setGlobalWarrantyLimit(parseInt(e.target.value) || 2)}
-                  className="w-20 bg-slate-700/50 border-slate-600 text-white"
+                  max={20}
+                  value={customLimitValue}
+                  onChange={(e) => setCustomLimitValue(parseInt(e.target.value) || 3)}
+                  className="bg-slate-700/50 border-slate-600 text-white w-24"
                 />
               </div>
               <Button
-                onClick={handleSaveGlobalWarrantyLimit}
-                disabled={savingGlobalLimit}
+                onClick={handleSaveCustomPhoneLimit}
+                disabled={savingCustomLimit}
                 className="bg-amber-600 hover:bg-amber-700 text-white"
               >
-                {savingGlobalLimit ? 'Saving...' : 'Save'}
+                {savingCustomLimit ? 'Saving...' : 'Save Limit'}
               </Button>
-              <span className="text-sm text-slate-400">
-                (Currently: {globalWarrantyLimit} warranties per phone number)
-              </span>
             </div>
+            <p className="text-sm text-slate-500">
+              Default limit for new users: 2 warranties per phone number
+            </p>
           </CardContent>
         </Card>
 

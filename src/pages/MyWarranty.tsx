@@ -12,15 +12,14 @@ import { Shield, Search, Calendar, Clock, Package, ArrowLeft } from 'lucide-reac
 import type { WarrantyWithDetails } from '@/lib/supabase-types';
 
 export default function MyWarranty() {
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [serialNumber, setSerialNumber] = useState('');
   const [warranties, setWarranties] = useState<WarrantyWithDetails[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
 
   const handleSearch = async () => {
-    if (!fullName.trim() || !phone.trim()) {
-      toast.error('Please enter both your full name and phone number');
+    if (!serialNumber.trim()) {
+      toast.error('Please enter a serial number');
       return;
     }
 
@@ -28,27 +27,28 @@ export default function MyWarranty() {
     setSearched(true);
 
     try {
-      // Find the warranty owner by full name AND phone
-      const { data: owners, error: ownerError } = await supabase
-        .from('warranty_owners')
-        .select('*')
-        .ilike('full_name', `%${fullName.trim()}%`)
-        .ilike('phone', `%${phone.trim()}%`);
-
-      if (ownerError) {
-        throw ownerError;
+      // Combine with prefix if user only entered suffix
+      let searchSerial = serialNumber.trim().toUpperCase();
+      if (!searchSerial.startsWith('IGN-EPC-6L-2601-')) {
+        searchSerial = 'IGN-EPC-6L-2601-' + searchSerial;
       }
 
-      if (!owners || owners.length === 0) {
+      // Find the product by serial number
+      const { data: productData, error: productError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('serial_number', searchSerial)
+        .maybeSingle();
+
+      if (productError) throw productError;
+
+      if (!productData) {
         setWarranties([]);
-        toast.error('No warranties found');
+        toast.error('No warranty found for this serial number');
         return;
       }
 
-      // Get all owner IDs
-      const ownerIds = owners.map(o => o.id);
-
-      // Fetch all warranties for these owners
+      // Fetch warranty for this product
       const { data: warrantiesData, error: warrantiesError } = await supabase
         .from('warranties')
         .select(`
@@ -56,21 +56,18 @@ export default function MyWarranty() {
           product:products(*),
           owner:warranty_owners(*)
         `)
-        .in('owner_id', ownerIds)
-        .order('created_at', { ascending: false });
+        .eq('product_id', productData.id);
 
-      if (warrantiesError) {
-        throw warrantiesError;
-      }
+      if (warrantiesError) throw warrantiesError;
 
       setWarranties((warrantiesData as unknown as WarrantyWithDetails[]) || []);
       
       if (warrantiesData && warrantiesData.length > 0) {
-        toast.success(`Found ${warrantiesData.length} warranty(ies)`);
+        toast.success('Warranty found!');
       }
     } catch (error: any) {
-      console.error('Error fetching warranties:', error);
-      toast.error('Failed to fetch warranties');
+      console.error('Error fetching warranty:', error);
+      toast.error('Failed to fetch warranty');
     } finally {
       setLoading(false);
     }
@@ -102,40 +99,31 @@ export default function MyWarranty() {
             <Shield className="w-8 h-8 text-emerald-400" />
           </div>
           <h1 className="text-3xl font-bold text-white mb-2">My Warranties</h1>
-          <p className="text-slate-400">Enter your name and phone number to view your warranties</p>
+          <p className="text-slate-400">Enter your product serial number to view warranty details</p>
         </div>
 
         {/* Search Section */}
         <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm mb-8">
           <CardHeader>
-            <CardTitle className="text-white text-lg">Search Warranties</CardTitle>
+            <CardTitle className="text-white text-lg">Search Warranty</CardTitle>
             <CardDescription className="text-slate-400">
-              Enter the details you used when registering your warranty
+              Enter your product serial number to view warranty details
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="fullName" className="text-slate-200">Full Name</Label>
-              <Input
-                id="fullName"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Enter your full name"
-                className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500"
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone" className="text-slate-200">Phone Number</Label>
-              <Input
-                id="phone"
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="Enter your phone number"
-                className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500"
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              />
+              <Label htmlFor="serialNumber" className="text-slate-200">Serial Number</Label>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-400 text-sm whitespace-nowrap">IGN-EPC-6L-2601-</span>
+                <Input
+                  id="serialNumber"
+                  value={serialNumber}
+                  onChange={(e) => setSerialNumber(e.target.value.toUpperCase())}
+                  placeholder="e.g., KE-001600"
+                  className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500"
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                />
+              </div>
             </div>
             <Button
               onClick={handleSearch}
@@ -147,7 +135,7 @@ export default function MyWarranty() {
               ) : (
                 <>
                   <Search className="w-4 h-4 mr-2" />
-                  Search Warranties
+                  Search Warranty
                 </>
               )}
             </Button>
@@ -163,7 +151,7 @@ export default function MyWarranty() {
                   <Shield className="w-12 h-12 text-slate-600 mx-auto mb-4" />
                   <p className="text-slate-400 mb-2">No warranties found</p>
                   <p className="text-sm text-slate-500 mb-4">
-                    Make sure you entered the same name and phone number used during registration
+                    Make sure you entered the correct serial number
                   </p>
                   <Link to="/activate-warranty">
                     <Button variant="link" className="text-emerald-400">
