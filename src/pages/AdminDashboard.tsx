@@ -24,7 +24,11 @@ import {
   Home,
   Upload,
   Plus,
-  Hash
+  Hash,
+  Phone,
+  ChevronDown,
+  ChevronRight,
+  Users
 } from 'lucide-react';
 import type { WarrantyWithDetails, Product } from '@/lib/supabase-types';
 import QRCode from 'qrcode';
@@ -95,6 +99,10 @@ export default function AdminDashboard() {
 
   // Global warranty limit setting
   const [globalWarrantyLimit, setGlobalWarrantyLimit] = useState<number>(2);
+
+  // Warranties by phone number
+  const [showPhoneGroupDialog, setShowPhoneGroupDialog] = useState(false);
+  const [expandedPhones, setExpandedPhones] = useState<Set<string>>(new Set());
   const [savingGlobalLimit, setSavingGlobalLimit] = useState(false);
 
   useEffect(() => {
@@ -467,6 +475,35 @@ export default function AdminDashboard() {
     navigate('/admin/login');
   };
 
+  // Group warranties by phone number
+  const getWarrantiesByPhone = () => {
+    const phoneMap = new Map<string, { owner: WarrantyOwner; warranties: WarrantyWithDetails[] }>();
+    
+    for (const warranty of warranties) {
+      const phone = warranty.owner.phone;
+      if (!phoneMap.has(phone)) {
+        phoneMap.set(phone, { owner: warranty.owner as WarrantyOwner, warranties: [] });
+      }
+      phoneMap.get(phone)!.warranties.push(warranty);
+    }
+    
+    // Sort by number of warranties (descending)
+    return Array.from(phoneMap.entries())
+      .sort((a, b) => b[1].warranties.length - a[1].warranties.length);
+  };
+
+  const togglePhoneExpand = (phone: string) => {
+    setExpandedPhones(prev => {
+      const next = new Set(prev);
+      if (next.has(phone)) {
+        next.delete(phone);
+      } else {
+        next.add(phone);
+      }
+      return next;
+    });
+  };
+
   const calculateDaysRemaining = (expiryDate: string): number => {
     const expiry = new Date(expiryDate);
     const today = new Date();
@@ -608,6 +645,47 @@ export default function AdminDashboard() {
                 (Currently: {globalWarrantyLimit} warranties per phone number)
               </span>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Warranties By Phone Number */}
+        <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm mb-6">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2">
+              <Phone className="w-5 h-5" />
+              Warranties By Phone Number
+            </CardTitle>
+            <CardDescription className="text-slate-400">
+              View warranties grouped by phone number to identify multiple registrations
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div className="bg-slate-700/50 rounded-lg p-4">
+                <p className="text-sm text-slate-400">Unique Phone Numbers</p>
+                <p className="text-2xl font-bold text-white">{getWarrantiesByPhone().length}</p>
+              </div>
+              <div className="bg-slate-700/50 rounded-lg p-4">
+                <p className="text-sm text-slate-400">Phones with Multiple Warranties</p>
+                <p className="text-2xl font-bold text-amber-400">
+                  {getWarrantiesByPhone().filter(([_, data]) => data.warranties.length > 1).length}
+                </p>
+              </div>
+              <div className="bg-slate-700/50 rounded-lg p-4">
+                <p className="text-sm text-slate-400">Phones at Limit</p>
+                <p className="text-2xl font-bold text-red-400">
+                  {getWarrantiesByPhone().filter(([_, data]) => data.warranties.length >= globalWarrantyLimit).length}
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={() => setShowPhoneGroupDialog(true)}
+              variant="ghost"
+              className="text-slate-400 hover:text-white"
+            >
+              <Users className="w-4 h-4 mr-2" />
+              View All Grouped By Phone →
+            </Button>
           </CardContent>
         </Card>
 
@@ -1095,6 +1173,127 @@ export default function AdminDashboard() {
             <Button
               variant="outline"
               onClick={() => setShowSerialsListDialog(false)}
+              className="border-slate-600 text-slate-300 hover:bg-slate-700"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Warranties By Phone Dialog */}
+      <Dialog open={showPhoneGroupDialog} onOpenChange={setShowPhoneGroupDialog}>
+        <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Phone className="w-5 h-5" />
+              Warranties Grouped By Phone Number
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              {getWarrantiesByPhone().length} unique phone numbers with {totalWarranties} total warranties
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto space-y-2">
+            {getWarrantiesByPhone().map(([phone, data]) => {
+              const isExpanded = expandedPhones.has(phone);
+              const isAtLimit = data.warranties.length >= globalWarrantyLimit;
+              const hasMultiple = data.warranties.length > 1;
+              
+              return (
+                <div key={phone} className="border border-slate-700 rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => togglePhoneExpand(phone)}
+                    className="w-full flex items-center justify-between p-4 bg-slate-700/50 hover:bg-slate-700/70 transition-colors"
+                  >
+                    <div className="flex items-center gap-4">
+                      {isExpanded ? (
+                        <ChevronDown className="w-4 h-4 text-slate-400" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4 text-slate-400" />
+                      )}
+                      <div className="text-left">
+                        <p className="text-white font-medium">{phone}</p>
+                        <p className="text-sm text-slate-400">{data.owner.full_name}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Badge 
+                        className={
+                          isAtLimit 
+                            ? 'bg-red-500/20 text-red-400' 
+                            : hasMultiple 
+                              ? 'bg-amber-500/20 text-amber-400' 
+                              : 'bg-slate-600/50 text-slate-300'
+                        }
+                      >
+                        {data.warranties.length} {data.warranties.length === 1 ? 'warranty' : 'warranties'}
+                      </Badge>
+                      {isAtLimit && (
+                        <Badge className="bg-red-500/20 text-red-400 text-xs">
+                          At Limit
+                        </Badge>
+                      )}
+                    </div>
+                  </button>
+                  
+                  {isExpanded && (
+                    <div className="p-4 bg-slate-800/50 border-t border-slate-700">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <p className="text-xs text-slate-500">Email</p>
+                          <p className="text-sm text-slate-300">{data.owner.email}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500">Warranty Limit</p>
+                          <p className="text-sm text-slate-300">{data.owner.warranty_limit}</p>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-xs text-slate-500 uppercase tracking-wide">Registered Products</p>
+                        {data.warranties.map((warranty) => (
+                          <div 
+                            key={warranty.id}
+                            className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg"
+                          >
+                            <div>
+                              <p className="text-sm text-white">{warranty.product.product_type}</p>
+                              <p className="text-xs text-slate-400 font-mono">{warranty.product.serial_number}</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <Badge 
+                                className={
+                                  warranty.status === 'expired' 
+                                    ? 'bg-red-500/20 text-red-400' 
+                                    : 'bg-emerald-500/20 text-emerald-400'
+                                }
+                              >
+                                {warranty.status}
+                              </Badge>
+                              <Button
+                                onClick={() => {
+                                  setShowPhoneGroupDialog(false);
+                                  handleViewWarranty(warranty);
+                                }}
+                                variant="ghost"
+                                size="sm"
+                                className="text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowPhoneGroupDialog(false)}
               className="border-slate-600 text-slate-300 hover:bg-slate-700"
             >
               Close
