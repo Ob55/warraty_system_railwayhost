@@ -10,7 +10,6 @@ import MyWarranty from "./pages/MyWarranty";
 import WarrantyDetails from "./pages/WarrantyDetails";
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
-import SystemOverview from "./pages/SystemOverview";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,7 +29,6 @@ const App = () => (
             <Route path="/warranty-details/:warrantyId" element={<WarrantyDetails />} />
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            <Route path="/admin/system-overview" element={<SystemOverview />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

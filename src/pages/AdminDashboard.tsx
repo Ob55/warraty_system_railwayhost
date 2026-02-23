@@ -787,34 +787,6 @@ export default function AdminDashboard() {
               </Button>
             </CardContent>
           </Card>
-
-          <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <Presentation className="w-5 h-5" />
-                System Overview Slides
-              </CardTitle>
-              <CardDescription className="text-slate-400">
-                Presentation explaining how the IGNIS warranty system works for team training
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center gap-4 flex-1 justify-center">
-              <div className="text-center space-y-3">
-                <p className="text-slate-300">9 slides covering:</p>
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {['Customer Journey', 'Serial Validation', 'Phone Limits', 'Admin Features', 'Warranty Lifecycle'].map(tag => (
-                    <Badge key={tag} className="bg-slate-700 text-slate-300 border-slate-600">{tag}</Badge>
-                  ))}
-                </div>
-              </div>
-              <Link to="/admin/system-overview">
-                <Button className="bg-amber-600 hover:bg-amber-700 text-white mt-4">
-                  <Presentation className="w-4 h-4 mr-2" />
-                  Open Presentation
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Add / Manage Warranty Limits by Phone Number */}
