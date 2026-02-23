@@ -29,7 +29,9 @@ import {
   Phone,
   ChevronDown,
   ChevronRight,
-  Users
+  Users,
+  Download,
+  Presentation
 } from 'lucide-react';
 import type { WarrantyWithDetails, Product } from '@/lib/supabase-types';
 import QRCode from 'qrcode';
@@ -116,6 +118,26 @@ export default function AdminDashboard() {
   const [showPhoneGroupDialog, setShowPhoneGroupDialog] = useState(false);
   const [expandedPhones, setExpandedPhones] = useState<Set<string>>(new Set());
   const [savingGlobalLimit, setSavingGlobalLimit] = useState(false);
+
+  // Site QR Code
+  const [siteQrUrl, setSiteQrUrl] = useState('');
+
+  useEffect(() => {
+    // Generate site QR code on mount
+    QRCode.toDataURL('https://warrantystem.lovable.app', {
+      width: 300,
+      margin: 2,
+      color: { dark: '#000000', light: '#ffffff' },
+    }).then(url => setSiteQrUrl(url)).catch(console.error);
+  }, []);
+
+  const handleDownloadSiteQR = () => {
+    if (!siteQrUrl) return;
+    const link = document.createElement('a');
+    link.download = 'IGNIS-Warranty-QR.png';
+    link.href = siteQrUrl;
+    link.click();
+  };
 
   useEffect(() => {
     if (!isLoading && (!user || !isAdmin)) {
@@ -735,6 +757,62 @@ export default function AdminDashboard() {
                   <p className="text-3xl font-bold text-white">{expiredWarranties}</p>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Quick Actions: QR Code & System Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <QrCode className="w-5 h-5" />
+                Registration QR Code
+              </CardTitle>
+              <CardDescription className="text-slate-400">
+                Scan this QR code to go to the warranty registration page
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center gap-4">
+              {siteQrUrl && (
+                <img src={siteQrUrl} alt="Warranty Registration QR Code" className="w-48 h-48 rounded-lg" />
+              )}
+              <p className="text-sm text-slate-400 font-mono">warrantystem.lovable.app</p>
+              <Button
+                onClick={handleDownloadSiteQR}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download QR Code
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <Presentation className="w-5 h-5" />
+                System Overview Slides
+              </CardTitle>
+              <CardDescription className="text-slate-400">
+                Presentation explaining how the IGNIS warranty system works for team training
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center gap-4 flex-1 justify-center">
+              <div className="text-center space-y-3">
+                <p className="text-slate-300">9 slides covering:</p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {['Customer Journey', 'Serial Validation', 'Phone Limits', 'Admin Features', 'Warranty Lifecycle'].map(tag => (
+                    <Badge key={tag} className="bg-slate-700 text-slate-300 border-slate-600">{tag}</Badge>
+                  ))}
+                </div>
+              </div>
+              <Link to="/admin/system-overview">
+                <Button className="bg-amber-600 hover:bg-amber-700 text-white mt-4">
+                  <Presentation className="w-4 h-4 mr-2" />
+                  Open Presentation
+                </Button>
+              </Link>
             </CardContent>
           </Card>
         </div>
