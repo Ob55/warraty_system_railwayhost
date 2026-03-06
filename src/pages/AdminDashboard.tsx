@@ -124,7 +124,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     // Generate site QR code on mount
-    QRCode.toDataURL('https://warrantystem.lovable.app', {
+    QRCode.toDataURL('https://warraty-system-railwayhost.vercel.app/', {
       width: 300,
       margin: 2,
       color: { dark: '#000000', light: '#ffffff' },
