@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { Shield, CheckCircle, ArrowLeft, FileText, RefreshCw } from 'lucide-react';
+import { Shield, CheckCircle, ArrowLeft, FileText } from 'lucide-react';
 import type { Product, ProductType } from '@/lib/supabase-types';
 
 const SERIAL_PREFIX = 'IGN-EPC-6L-2601-';
@@ -24,11 +24,9 @@ export default function ActivateWarranty() {
   const [submitting, setSubmitting] = useState(false);
   
   // Get initial checkbox state from navigation (if coming from Index)
-  const initialState = location.state as { privacyAgreed?: boolean; returnAgreed?: boolean } | null;
-  const [privacyAgreed, setPrivacyAgreed] = useState(initialState?.privacyAgreed ?? false);
-  const [returnAgreed, setReturnAgreed] = useState(initialState?.returnAgreed ?? false);
-  const [showPrivacyDialog, setShowPrivacyDialog] = useState(false);
-  const [showReturnDialog, setShowReturnDialog] = useState(false);
+  const initialState = location.state as { policiesAgreed?: boolean } | null;
+  const [policiesAgreed, setPoliciesAgreed] = useState(initialState?.policiesAgreed ?? false);
+  const [showPolicyDialog, setShowPolicyDialog] = useState(false);
   const [glowCards, setGlowCards] = useState(false);
   
   const [formData, setFormData] = useState({
@@ -114,8 +112,8 @@ export default function ActivateWarranty() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Check if both policies are agreed
-    if (!privacyAgreed || !returnAgreed) {
+    // Check if policies are agreed
+    if (!policiesAgreed) {
       setGlowCards(true);
       toast.error('Kindly click the Privacy Policy and Return & Refund Policy checkboxes to agree to the policies and proceed with product registration.');
       setTimeout(() => setGlowCards(false), 2000);
@@ -200,7 +198,7 @@ export default function ActivateWarranty() {
     }
   };
 
-  const bothPoliciesAgreed = privacyAgreed && returnAgreed;
+  const bothPoliciesAgreed = policiesAgreed;
 
   if (loading) {
     return (
@@ -224,43 +222,23 @@ export default function ActivateWarranty() {
         </div>
 
         {/* Policy Agreement Cards */}
-        <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="mb-4">
           <Card 
             className={`bg-slate-800/50 border-slate-700 backdrop-blur-sm cursor-pointer hover:border-slate-600 transition-all ${
-              glowCards && !privacyAgreed ? 'ring-2 ring-amber-500 animate-pulse' : ''
-            } ${privacyAgreed ? 'border-emerald-500/50' : ''}`}
-            onClick={() => setShowPrivacyDialog(true)}
+              glowCards && !policiesAgreed ? 'ring-2 ring-amber-500 animate-pulse' : ''
+            } ${policiesAgreed ? 'border-emerald-500/50' : ''}`}
+            onClick={() => setShowPolicyDialog(true)}
           >
             <CardHeader className="p-3">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
                   <FileText className="w-4 h-4 text-emerald-400" />
                 </div>
-                {privacyAgreed && <CheckCircle className="w-4 h-4 text-emerald-400" />}
+                {policiesAgreed && <CheckCircle className="w-4 h-4 text-emerald-400" />}
               </div>
-              <CardTitle className="text-white text-sm">Privacy Policy</CardTitle>
+              <CardTitle className="text-white text-sm">Terms & Policies</CardTitle>
               <CardDescription className="text-slate-400 text-xs">
-                Click to read and agree
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card 
-            className={`bg-slate-800/50 border-slate-700 backdrop-blur-sm cursor-pointer hover:border-slate-600 transition-all ${
-              glowCards && !returnAgreed ? 'ring-2 ring-amber-500 animate-pulse' : ''
-            } ${returnAgreed ? 'border-emerald-500/50' : ''}`}
-            onClick={() => setShowReturnDialog(true)}
-          >
-            <CardHeader className="p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                  <RefreshCw className="w-4 h-4 text-blue-400" />
-                </div>
-                {returnAgreed && <CheckCircle className="w-4 h-4 text-emerald-400" />}
-              </div>
-              <CardTitle className="text-white text-sm">Return & Refund</CardTitle>
-              <CardDescription className="text-slate-400 text-xs">
-                Click to read and agree
+                Click to read and agree to the Privacy Policy and Return & Refund Policy
               </CardDescription>
             </CardHeader>
           </Card>
@@ -400,16 +378,18 @@ export default function ActivateWarranty() {
         )}
       </div>
 
-      {/* Privacy Policy Dialog */}
-      <Dialog open={showPrivacyDialog} onOpenChange={setShowPrivacyDialog}>
+      {/* Terms & Policies Dialog */}
+      <Dialog open={showPolicyDialog} onOpenChange={setShowPolicyDialog}>
         <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle className="text-xl">IGNIS Innovation — Privacy Policy</DialogTitle>
+            <DialogTitle className="text-xl">IGNIS Innovation — Terms & Policies</DialogTitle>
             <DialogDescription className="text-slate-400">
-              Full Detail
+              Privacy Policy and Return & Refund Policy
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-auto space-y-6 py-4 text-slate-300">
+            <h2 className="text-lg font-bold text-emerald-400">Privacy Policy</h2>
+
             <section>
               <h3 className="text-white font-semibold mb-2">What personal data we collect</h3>
               <ul className="list-disc list-inside space-y-1 text-sm">
@@ -473,42 +453,10 @@ export default function ActivateWarranty() {
               </ul>
             </section>
 
-            <div className="flex items-center space-x-2 pt-4 border-t border-slate-700">
-              <Checkbox 
-                id="privacy-agree" 
-                checked={privacyAgreed}
-                onCheckedChange={(checked) => setPrivacyAgreed(checked === true)}
-              />
-              <label 
-                htmlFor="privacy-agree" 
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                I have read and agree to the Privacy Policy
-              </label>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              onClick={() => setShowPrivacyDialog(false)}
-              variant="outline"
-              className="border-slate-600 text-slate-300 hover:bg-slate-700"
-            >
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <div className="border-t border-slate-600 my-4" />
 
-      {/* Return & Refund Policy Dialog */}
-      <Dialog open={showReturnDialog} onOpenChange={setShowReturnDialog}>
-        <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="text-xl">IGNIS Innovation — Return & Refund Policy</DialogTitle>
-            <DialogDescription className="text-slate-400">
-              Full Detail
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex-1 overflow-auto space-y-6 py-4 text-slate-300">
+            <h2 className="text-lg font-bold text-blue-400">Return & Refund Policy</h2>
+
             <section>
               <h3 className="text-white font-semibold mb-2">Eligibility for Returns</h3>
               <p className="text-sm mb-2">A customer may return a product ONLY if:</p>
@@ -558,21 +506,21 @@ export default function ActivateWarranty() {
 
             <div className="flex items-center space-x-2 pt-4 border-t border-slate-700">
               <Checkbox 
-                id="return-agree" 
-                checked={returnAgreed}
-                onCheckedChange={(checked) => setReturnAgreed(checked === true)}
+                id="policies-agree" 
+                checked={policiesAgreed}
+                onCheckedChange={(checked) => setPoliciesAgreed(checked === true)}
               />
               <label 
-                htmlFor="return-agree" 
+                htmlFor="policies-agree" 
                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
               >
-                I have read and agree to the Return & Refund Policy
+                I have read and agree to the Privacy Policy and Return & Refund Policy
               </label>
             </div>
           </div>
           <DialogFooter>
             <Button
-              onClick={() => setShowReturnDialog(false)}
+              onClick={() => setShowPolicyDialog(false)}
               variant="outline"
               className="border-slate-600 text-slate-300 hover:bg-slate-700"
             >
