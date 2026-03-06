@@ -4,13 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Shield, QrCode, Search, FileText, RefreshCw, Info } from 'lucide-react';
+import { Shield, QrCode, Search, FileText, Info } from 'lucide-react';
 
 export default function Index() {
-  const [showPrivacyDialog, setShowPrivacyDialog] = useState(false);
-  const [showReturnDialog, setShowReturnDialog] = useState(false);
-  const [privacyAgreed, setPrivacyAgreed] = useState(false);
-  const [returnAgreed, setReturnAgreed] = useState(false);
+  const [showPolicyDialog, setShowPolicyDialog] = useState(false);
+  const [policiesAgreed, setPoliciesAgreed] = useState(false);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -29,40 +27,24 @@ export default function Index() {
         </div>
 
         {/* Feature Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
-          {/* Privacy Policy Card */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
+          {/* Terms & Policies Card */}
           <Card 
             className="bg-slate-800/50 border-slate-700 backdrop-blur-sm cursor-pointer hover:border-slate-600 transition-colors"
-            onClick={() => setShowPrivacyDialog(true)}
+            onClick={() => setShowPolicyDialog(true)}
           >
             <CardHeader>
               <div className="w-12 h-12 rounded-lg bg-emerald-500/20 flex items-center justify-center mb-4">
                 <FileText className="w-6 h-6 text-emerald-400" />
               </div>
-              <CardTitle className="text-white">Privacy Policy</CardTitle>
+              <CardTitle className="text-white">Terms & Policies</CardTitle>
               <CardDescription className="text-slate-400">
-                Click to read how we collect, use, and protect your personal data in line with Kenyan data protection laws.
+                Click to read our Privacy Policy and Return & Refund Policy. You must agree before activating your warranty.
               </CardDescription>
             </CardHeader>
           </Card>
 
-          {/* Return & Refund Policy Card */}
-          <Card 
-            className="bg-slate-800/50 border-slate-700 backdrop-blur-sm cursor-pointer hover:border-slate-600 transition-colors"
-            onClick={() => setShowReturnDialog(true)}
-          >
-            <CardHeader>
-              <div className="w-12 h-12 rounded-lg bg-blue-500/20 flex items-center justify-center mb-4">
-                <RefreshCw className="w-6 h-6 text-blue-400" />
-              </div>
-              <CardTitle className="text-white">Return & Refund Policy</CardTitle>
-              <CardDescription className="text-slate-400">
-                Click to read our full return conditions and refund process.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          {/* Warranty Information Card (Static) */}
+          {/* Warranty Information Card */}
           <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
             <CardHeader>
               <div className="w-12 h-12 rounded-lg bg-amber-500/20 flex items-center justify-center mb-4">
@@ -88,7 +70,7 @@ export default function Index() {
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Link to="/activate-warranty" state={{ privacyAgreed, returnAgreed }}>
+          <Link to="/activate-warranty" state={{ policiesAgreed }}>
             <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white px-8">
               <QrCode className="w-5 h-5 mr-2" />
               Activate Warranty
@@ -113,16 +95,19 @@ export default function Index() {
         </div>
       </div>
 
-      {/* Privacy Policy Dialog */}
-      <Dialog open={showPrivacyDialog} onOpenChange={setShowPrivacyDialog}>
+      {/* Terms & Policies Dialog */}
+      <Dialog open={showPolicyDialog} onOpenChange={setShowPolicyDialog}>
         <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle className="text-xl">IGNIS Innovation — Privacy Policy</DialogTitle>
+            <DialogTitle className="text-xl">IGNIS Innovation — Terms & Policies</DialogTitle>
             <DialogDescription className="text-slate-400">
-              Full Detail
+              Privacy Policy and Return & Refund Policy
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-auto space-y-6 py-4 text-slate-300">
+            {/* Privacy Policy */}
+            <h2 className="text-lg font-bold text-emerald-400">Privacy Policy</h2>
+
             <section>
               <h3 className="text-white font-semibold mb-2">What personal data we collect</h3>
               <ul className="list-disc list-inside space-y-1 text-sm">
@@ -186,42 +171,12 @@ export default function Index() {
               </ul>
             </section>
 
-            <div className="flex items-center space-x-2 pt-4 border-t border-slate-700">
-              <Checkbox 
-                id="privacy-agree" 
-                checked={privacyAgreed}
-                onCheckedChange={(checked) => setPrivacyAgreed(checked === true)}
-              />
-              <label 
-                htmlFor="privacy-agree" 
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                I have read and agree to the Privacy Policy
-              </label>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              onClick={() => setShowPrivacyDialog(false)}
-              variant="outline"
-              className="border-slate-600 text-slate-300 hover:bg-slate-700"
-            >
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            {/* Divider */}
+            <div className="border-t border-slate-600 my-4" />
 
-      {/* Return & Refund Policy Dialog */}
-      <Dialog open={showReturnDialog} onOpenChange={setShowReturnDialog}>
-        <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="text-xl">IGNIS Innovation — Return & Refund Policy</DialogTitle>
-            <DialogDescription className="text-slate-400">
-              Full Detail
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex-1 overflow-auto space-y-6 py-4 text-slate-300">
+            {/* Return & Refund Policy */}
+            <h2 className="text-lg font-bold text-blue-400">Return & Refund Policy</h2>
+
             <section>
               <h3 className="text-white font-semibold mb-2">Eligibility for Returns</h3>
               <p className="text-sm mb-2">A customer may return a product ONLY if:</p>
@@ -269,23 +224,24 @@ export default function Index() {
               </p>
             </section>
 
+            {/* Single Checkbox */}
             <div className="flex items-center space-x-2 pt-4 border-t border-slate-700">
               <Checkbox 
-                id="return-agree" 
-                checked={returnAgreed}
-                onCheckedChange={(checked) => setReturnAgreed(checked === true)}
+                id="policies-agree" 
+                checked={policiesAgreed}
+                onCheckedChange={(checked) => setPoliciesAgreed(checked === true)}
               />
               <label 
-                htmlFor="return-agree" 
+                htmlFor="policies-agree" 
                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
               >
-                I have read and agree to the Return & Refund Policy
+                I have read and agree to the Privacy Policy and Return & Refund Policy
               </label>
             </div>
           </div>
           <DialogFooter>
             <Button
-              onClick={() => setShowReturnDialog(false)}
+              onClick={() => setShowPolicyDialog(false)}
               variant="outline"
               className="border-slate-600 text-slate-300 hover:bg-slate-700"
             >
