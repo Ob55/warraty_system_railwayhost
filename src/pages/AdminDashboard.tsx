@@ -777,7 +777,7 @@ export default function AdminDashboard() {
               {siteQrUrl && (
                 <img src={siteQrUrl} alt="Warranty Registration QR Code" className="w-48 h-48 rounded-lg" />
               )}
-              <p className="text-sm text-slate-400 font-mono">warrantystem.lovable.app</p>
+              <p className="text-sm text-slate-400 font-mono">warraty-system-railwayhost.vercel.app</p>
               <Button
                 onClick={handleDownloadSiteQR}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white"
